@@ -25,15 +25,18 @@ class ToolError(Exception):
     pass
 
 class Session:
-    def __init__(self, settle=0.05, poll=0.05, verbose=False, ep0=True):
+    def __init__(self, settle=0.05, poll=0.05, verbose=False, ep0=True, bulk_write=False):
         import libemcore
         self.settle, self.poll = settle, poll
         self.verbose, self.ep0 = verbose, ep0
         self.retries = 0
         self.em = libemcore.Emcore()
+        if bulk_write and (not self.em.lib.bulkout or (not ep0 and not self.em.lib.bulkin)):
+            self.em.close()
+            raise ToolError("requested bulk transport is unavailable on this device")
         if ep0:
             self.em.lib.bulkin = False
-        self.em.bulk_write = False
+        self.em.bulk_write = bulk_write
 
     def close(self):
         self.em.close()

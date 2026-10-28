@@ -165,14 +165,15 @@ class Session5G:
 
 def make_dev_session(**kw):
     class DevSession(Session5G, transport.Session):
-        def __init__(self, settle=0.05, poll=0.05, ep0=True):
+        def __init__(self, settle=0.05, poll=0.05, ep0=True, bulk_write=False):
             self.settle, self.poll = settle, poll
-            transport.Session.__init__(self, settle=settle, poll=poll, ep0=ep0)
+            transport.Session.__init__(self, settle=settle, poll=poll, ep0=ep0, bulk_write=bulk_write)
 
         def cmd(self, c, a=0, b=0, d=0):
             return transport.Session.cmd(self, c, a, b, d)
 
-        def read_chunk(self, addr, size):
+        def read(self, addr, size):
+            # libemcore splits control reads itself and batches bulk reads.
             return transport.Session.read(self, addr, size)
 
         def write_memory(self, addr, data):
@@ -190,7 +191,7 @@ def make_dev_session(**kw):
 
 
 def make_write_session(**kw):
-    """Device session for mutating commands: EP0 only, no USB replay."""
+    """Device session for mutating commands: EP0 by default, no USB replay."""
     s = make_dev_session(**kw)
     return s.no_retry()
 
@@ -202,7 +203,40 @@ def check(st, ok_lib=(0,)):
     return st
 
 
-class Writer:
+class LogicalReader:
+    """Bounded logical-sector reads shared by NAND and partition tools."""
+    def __init__(self, session):
+        self.s = session
+        st = session.status()
+        if st.busy or not st.blockio_blocks or not st.step_ok_mask & (1 << 4):
+            raise ToolError("finish n5g.py nand init --ftl first; the monitor must be idle")
+        self.total = st.blockio_blocks
+        self.maximum = min(RESULT_BYTES, st.result_cap) // BLOCK_BYTES
+        if self.maximum < 1:
+            raise ToolError("NAND result buffer is smaller than one logical sector")
+
+    def bounds(self, lba, count):
+        if lba < 0 or count < 1 or lba >= self.total or count > self.total - lba:
+            raise ValueError("logical sector range %d+%d outside the FTL (%d sectors)" % (lba, count, self.total))
+
+    def read(self, lba, count):
+        self.bounds(lba, count)
+        out = bytearray()
+        while count:
+            n = min(count, self.maximum)
+            if self.s.status().busy:
+                raise ToolError("another monitor client has queued a job")
+            st = check(self.s.job(CMD_BLOCK_READ, lba, n, timeout=120.0))
+            data = self.s.result(st, n * BLOCK_BYTES)
+            if len(data) != n * BLOCK_BYTES:
+                raise ToolError("short NAND read")
+            out.extend(data)
+            lba += n
+            count -= n
+        return bytes(out)
+
+
+class Writer(LogicalReader):
     """Logical 4 KiB-sector writes through commands 128..131 (Rockbox ftl_write / ftl_flush inside the kernel).
     Needs a session with write_memory(addr, data) and the read-only ladder up to the FTL mount (step 4). Data is
     staged in the harness result buffer and checked by CRC-32 on the device before the first NAND operation."""
@@ -220,22 +254,6 @@ class Writer:
             raise ToolError("finish the read-only ladder (n5g.py nand init --ftl) first; the monitor must be idle")
         self.total, self.maximum, self.staging = st.blockio_blocks, maximum, st.result_addr
         self.opened = False
-
-    def bounds(self, lba, count):
-        if lba < 0 or count < 1 or lba >= self.total or count > self.total - lba:
-            raise ValueError("logical sector range %d+%d outside the FTL (%d sectors)" % (lba, count, self.total))
-
-    def read(self, lba, count):
-        self.bounds(lba, count)
-        out = bytearray()
-        while count:
-            n = min(count, self.maximum)
-            st = check(self.s.job(CMD_BLOCK_READ, lba, n, timeout=120.0))
-            data = self.s.result(st, n * BLOCK_BYTES)
-            if len(data) != n * BLOCK_BYTES:
-                raise ToolError("short NAND read")
-            out.extend(data); lba += n; count -= n
-        return bytes(out)
 
     def open(self):
         if not self.opened:
