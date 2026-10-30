@@ -4,7 +4,7 @@ import argparse
 import importlib
 import sys
 
-COMMANDS = {'image': 'image', 'nand': 'nand'}
+COMMANDS = {'image': 'image', 'nand': 'nand', 'bench': 'bench', 'collect': 'collect', 'write-test': 'writetest'}
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
