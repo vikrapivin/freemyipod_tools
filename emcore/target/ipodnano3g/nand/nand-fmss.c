@@ -255,6 +255,184 @@ static void fmss_start_clean(void)
     FMSS_REG(0xc5c) = 0;
 }
 
+static const uint16_t fmss_probe_win[FMSS_PROBE_NWIN] = { 0x000, 0x400, 0x800, 0xc00, 0xd00 };
+
+static void fmss_probe_snap(uint32_t win[FMSS_PROBE_NWIN][64], uint32_t flags, uint32_t skip)
+{
+    unsigned int w, i;
+    for (w = 0; w < FMSS_PROBE_NWIN; w++)
+        for (i = 0; i < 64; i++)
+        {
+            uint32_t off = fmss_probe_win[w] + 4 * i;
+            /* 0x080 is the ID FIFO: a read pops it */
+            if (off == 0x080 || (skip >> w & 1) || (fmss_probe_win[w] == 0x400 && !(flags & FMSS_PROBE_WIN400)))
+                win[w][i] = 0;
+            else
+                win[w][i] = FMSS_REG(off);
+        }
+}
+
+static void fmss_probe_fullmap(uint32_t *dst)
+{
+    unsigned int i;
+    for (i = 0; i < 1024; i++)
+        /* 0x080 (and its copies 0x280, 0x480, 0x680) is an ID FIFO: a read pops it */
+        dst[i] = ((4 * i) & ~0x600u) == 0x080 ? 0 : FMSS_REG(4 * i);
+}
+
+int fmss_probe(const struct fmss_probe_req *q, const uint32_t *prog, struct fmss_probe_out *o)
+{
+    static uint32_t sram_prog[FMSS_PROBE_SRAM_BYTES / 4] __attribute__((section(".idata"), aligned(32)));
+    uint32_t start, now, irq = 0, timeout, i, last_pc = 0xffffffffu, r[8], last_r[8], late_done = 0, late2_done = 0;
+    uint32_t early, l1, pcon_saved[4];
+    if (q->magic != FMSS_PROBE_REQ_MAGIC || q->nparams > FMSS_PROBE_MAXPARAMS || q->nlate + q->nlate2 > q->nparams
+        || !q->prog_bytes
+        || (q->prog_bytes & 7) || ((uintptr_t)prog & 31))
+        return -1;
+    for (i = 0; i < q->nparams; i++)
+        if (q->params[i].off > 0xffc || (q->params[i].off & 3)) return -1;
+    if ((q->flags & FMSS_PROBE_PROG_SRAM) && q->prog_bytes > FMSS_PROBE_SRAM_BYTES) return -1;
+    early = q->nparams - q->nlate - q->nlate2;      /* params: early..., first late batch..., second batch... */
+    l1 = early + q->nlate;
+    timeout = q->timeout_us ? (q->timeout_us < 2000000 ? q->timeout_us : 2000000) : 100000;
+    memset(o, 0, sizeof(*o));
+    o->magic = FMSS_PROBE_OUT_MAGIC;
+    o->version = 12;                                 /* 12: whole VIC0 / VIC1 raw status words */
+    o->prog = (uint32_t)(uintptr_t)prog;
+    /* the controller set-up of fmss_init (pins, park, FMC +0x400 = 0), then a preflight: the END-only program
+       must complete, or the engine is not running at all */
+    nand_hw_enable();
+    if (q->flags & FMSS_PROBE_CH1_PINS)
+    {
+        /* channel 1 pins: port 10 pins 4..7, port 11 pins 0..4, port 12 pins 0..3, port 7 pin 4 (function 2) */
+        pcon_saved[0] = PCON(7); pcon_saved[1] = PCON(10); pcon_saved[2] = PCON(11); pcon_saved[3] = PCON(12);
+        PCON(12) = (PCON(12) & 0xffff0000) | 0x2222;
+        PCON(7) = (PCON(7) & 0xfff0ffff) | 0x20000;
+        PCON(10) = (PCON(10) & 0x0000ffff) | 0x22220000;
+        PCON(11) = (PCON(11) & 0xfff00000) | 0x22222;
+    }
+    if (!(q->flags & FMSS_PROBE_NO_RESET))
+    {
+        FMSS_CTRL = FMSS_CTRL_RESET;
+        udelay(1000);
+    }
+    if (!(q->flags & FMSS_PROBE_NO_CLEAN)) fmss_start_clean();
+    fmss_clear_irq();
+    if (!(q->flags & FMSS_PROBE_NO_400)) FMC_REG_400 = 0;
+    if (q->flags & FMSS_PROBE_NO_PREFLIGHT)
+        o->pre_ok = 2;                              /* preflight skipped on request */
+    else
+    {
+        FMSS_PROG = (uint32_t)(uintptr_t)fmss_idle;
+        FMSS_CS_IRQ = CS_IRQ_ALL;
+        start = USEC_TIMER;
+        FMSS_CTRL = FMSS_CTRL_START;
+        while (!(FMSS_CS_IRQ & (CS_IRQ_DONE | CS_IRQ_FAULT)) && USEC_TIMER - start < 10000)
+            ;
+        o->pre_us = USEC_TIMER - start;
+        o->pre_cs_irq = FMSS_CS_IRQ;
+        o->pre_c00 = FMSS_CTRL;
+        o->pre_ok = (o->pre_cs_irq & (CS_IRQ_DONE | CS_IRQ_FAULT)) == CS_IRQ_DONE;
+        fmss_clear_irq();
+    }
+    if (!(q->flags & FMSS_PROBE_KEEP_CTRL0)) FMCTRL0 = 0;
+    for (i = 0; i < early; i++)
+        FMSS_REG(q->params[i].off) = q->params[i].val;
+    if (q->flags & FMSS_PROBE_PROG_SRAM)
+    {
+        memcpy(sram_prog, prog, q->prog_bytes);
+        prog = sram_prog;
+        o->prog = (uint32_t)(uintptr_t)prog;
+    }
+    fmss_probe_snap(o->before, q->flags, q->flags >> FMSS_PROBE_SNAP_SKIP_SHIFT & 0x1f);   /* the starting state */
+    if (q->flags & FMSS_PROBE_FULLMAP) fmss_probe_fullmap(o->fullmap[0]);
+    commit_dcache_range(prog, q->prog_bytes);
+    for (i = 0; i < 8; i++) last_r[i] = 0xffffffffu;
+    FMSS_PROG = (uint32_t)(uintptr_t)prog;
+    FMSS_CS_IRQ = CS_IRQ_ALL;
+    start = USEC_TIMER;
+    FMSS_CTRL = q->start_value ? q->start_value : FMSS_CTRL_START;
+    for (;;)
+    {
+        uint32_t pc = FMSS_REG(0xc38), changed = pc != last_pc;
+        now = USEC_TIMER;
+        o->polls++;
+        if (q->nlate && !late_done && now - start >= q->late_us)
+        {
+            for (i = early; i < l1; i++)
+                FMSS_REG(q->params[i].off) = q->params[i].val;
+            late_done = 1;
+            o->late_at_us = now - start;
+        }
+        if (q->nlate2 && late_done && !late2_done && now - start >= q->late2_us)
+        {
+            for (i = l1; i < q->nparams; i++)
+                FMSS_REG(q->params[i].off) = q->params[i].val;
+            late2_done = 1;
+            o->late2_at_us = now - start;
+        }
+        o->irq_seen |= VIC1RAWINTR;
+        o->vic0_seen |= VIC0RAWINTR;
+        for (i = 0; i < 8; i++)
+        {
+            /* r0..r7 only on request; by default r[7] carries CS_IRQ (what the driver itself polls) */
+            r[i] = (q->flags & FMSS_PROBE_SAMPLE_REGS) ? FMSS_REG(0xc18 + 4 * i) : i == 7 ? FMSS_CS_IRQ : 0;
+            if (r[i] != last_r[i]) changed = 1;
+        }
+        if (changed)
+        {
+            if (o->nsamples < FMSS_PROBE_MAXSAMPLES)
+            {
+                struct fmss_probe_sample *p = &o->s[o->nsamples++];
+                p->t_us = now - start;
+                p->pc = pc;
+                memcpy(p->r, r, sizeof(r));
+            }
+            else o->dropped++;
+            last_pc = pc;
+            memcpy(last_r, r, sizeof(r));
+        }
+        irq = FMSS_CS_IRQ & (CS_IRQ_DONE | CS_IRQ_FAULT);
+        if ((irq & CS_IRQ_FAULT) && !o->fault_at_us) o->fault_at_us = (now - start) | 1;
+        if (q->flags & FMSS_PROBE_WAIT_END ? (irq & CS_IRQ_DONE) : irq) break;
+        if (now - start >= timeout) break;
+    }
+    o->elapsed_us = USEC_TIMER - start;
+    o->why = (irq & CS_IRQ_FAULT) ? FMSS_PROBE_FAULT : (irq & CS_IRQ_DONE) ? FMSS_PROBE_END : FMSS_PROBE_TIMEOUT;
+    o->cs_irq = FMSS_CS_IRQ;
+    o->seq_result = FMSS_RESULT;
+    o->pc = FMSS_REG(0xc38);
+    o->c50 = FMSS_REG(0xc50);
+    o->irq_end = VIC1RAWINTR;
+    fmss_probe_snap(o->after, q->flags, 0);
+    if (q->flags & FMSS_PROBE_FULLMAP) fmss_probe_fullmap(o->fullmap[1]);
+    if (q->flags & FMSS_PROBE_END_RESET)
+    {
+        FMSS_CTRL = FMSS_CTRL_RESET;                /* stop it; C58 / C4C / C5C stay */
+        udelay(1000);
+        fmss_clear_irq();
+        FMCTRL0 = 0;
+    }
+    else if (q->flags & FMSS_PROBE_END_NOCLEAN)
+    {
+        FMSS_CTRL = FMSS_CTRL_RESET;                /* the park as it was before the start-clean existed */
+        udelay(1000);
+        FMSS_PROG = (uint32_t)(uintptr_t)fmss_idle;
+        FMSS_CS_IRQ = CS_IRQ_ALL;
+        FMSS_CTRL = FMSS_CTRL_START;
+        udelay(1000);
+        fmss_clear_irq();
+        FMCTRL0 = 0;
+    }
+    else
+        fmss_park();
+    if (q->flags & FMSS_PROBE_CH1_PINS)
+    {
+        PCON(7) = pcon_saved[0]; PCON(10) = pcon_saved[1]; PCON(11) = pcon_saved[2]; PCON(12) = pcon_saved[3];
+    }
+    return 0;
+}
+
 /* Stop whatever runs: reset the sequencer, run the END-only program, leave
  * the chip enables deselected */
 static void fmss_park(void)

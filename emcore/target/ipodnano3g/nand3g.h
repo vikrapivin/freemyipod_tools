@@ -59,6 +59,7 @@
 #define N3G_JOB_BACKEND    10u  /* arg0 = backend index */
 #define N3G_JOB_BENCH      11u  /* parameters in the result buffer (struct n3g_bench_params) */
 #define N3G_JOB_META_SCAN  12u  /* arg0 = first block, arg1 = blocks: spare records of every page (read only) */
+#define N3G_JOB_FMSS_PROBE 14u  /* arg0 = staged bytes, arg1 = CRC-32: run one sequencer program, record the state */
 
 /* USB monitor commands (usbdebug.c); numbering follows the nano 5G target.
  * 122, 126, 127 and 132..134 (5G ROM page, reserved, block read, modules)
@@ -75,7 +76,15 @@
 #define N3G_NAND_BACKEND    135   /* (index): select the physical backend; invalidates init/FTL */
 #define N3G_NAND_BENCH      136   /* run the benchmark described in the result buffer */
 #define N3G_NAND_META_SCAN  137   /* (first block, blocks): read every page of those blocks on every bank */
+#define N3G_NAND_FMSS_PROBE 139   /* (staged bytes, CRC-32): see N3G_PROBE_* */
 
+/* FMSS probe layout in the result buffer: struct fmss_probe_req at +0, the program at +N3G_PROBE_PROG (32-byte
+ * aligned), struct fmss_probe_out written at +N3G_PROBE_OUT, and a scratch area for ldi / sti at +N3G_PROBE_SCRATCH
+ * (its bus address = result_addr + N3G_PROBE_SCRATCH; the CPU cache is written back before and dropped after). */
+#define N3G_PROBE_PROG     0x400u
+#define N3G_PROBE_OUT      0x20000u
+#define N3G_PROBE_SCRATCH  0x38000u
+#define N3G_PROBE_SCRATCH_BYTES 0x8000u
 #define N3G_NAND_HEARTBEAT  200   /* {1, 0, w0, w1} */
 
 #define N3G_STATE_IDLE     0u

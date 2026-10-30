@@ -47,6 +47,8 @@ volatile struct n3g_nand_status n3g_nand_status;
 
 _Static_assert(sizeof(struct n3g_nand_status) == N3G_STATUS_BYTES, "status record layout (nano3g/nand.py mirrors it)");
 _Static_assert(sizeof(struct n3g_bench_params) == N3G_BENCH_PARAM_BYTES, "bench params layout");
+_Static_assert(N3G_PROBE_OUT + sizeof(struct fmss_probe_out) <= N3G_PROBE_SCRATCH, "probe output fits before the scratch area");
+_Static_assert(N3G_PROBE_PROG >= sizeof(struct fmss_probe_req), "probe request fits before the program");
 _Static_assert(sizeof(struct n3g_bench_result) == N3G_BENCH_RESULT_BYTES, "bench result layout");
 _Static_assert(N3G_BENCH_CPU_OFF + sizeof(struct n3g_bench_cpu) <= N3G_BENCH_REP_OFF, "bench cpu block");
 
@@ -277,6 +279,31 @@ static uint32_t job_meta_scan(uint32_t first, uint32_t nblocks, uint32_t *result
     }
     S.job_detail[0] = nblocks;
     S.result_len = nblocks * g->banks * ppb * N3G_MS_RECORD;
+    return 0;
+}
+
+/* run one caller-supplied sequencer program (struct fmss_probe_req + program staged in the result buffer) and
+   record the state; the physical layer is re-initialised afterwards (the program may have changed anything) */
+static uint32_t job_fmss_probe(uint32_t bytes, uint32_t crc, uint32_t *result)
+{
+    const struct fmss_probe_req *q = (const struct fmss_probe_req *)g_result;
+    struct fmss_probe_out *o = (struct fmss_probe_out *)(g_result + N3G_PROBE_OUT);
+    int rc;
+    if (!need(1u << N3G_STEP_GATES)) { *result = N3G_R_PRECOND; return 0; }
+    if (bytes < N3G_PROBE_PROG || bytes > N3G_PROBE_OUT) { *result = N3G_R_BAD_ARG; return 0; }
+    discard_dcache_range(g_result, bytes);
+    if (crc32(g_result, bytes) != crc || q->prog_bytes + N3G_PROBE_PROG > bytes) { *result = N3G_R_BAD_ARG; return 0; }
+    commit_discard_dcache_range(g_result + N3G_PROBE_SCRATCH, N3G_PROBE_SCRATCH_BYTES);
+    rc = fmss_probe(q, (const uint32_t *)(g_result + N3G_PROBE_PROG), o);
+    discard_dcache_range(g_result + N3G_PROBE_SCRATCH, N3G_PROBE_SCRATCH_BYTES);
+    commit_dcache_range(o, sizeof(*o));
+    invalidate_ftl();
+    S.step_ok_mask &= ~(1u << N3G_STEP_PHYS);
+    nand_backend_select(nand_backend_active_index());
+    if (rc) { *result = N3G_R_BAD_ARG; return 0; }
+    S.job_detail[0] = o->why;
+    S.job_detail[1] = o->elapsed_us;
+    S.job_detail[2] = o->nsamples;
     return 0;
 }
 
@@ -1137,6 +1164,7 @@ static void run_job(uint32_t kind, const uint32_t *arg)
     case N3G_JOB_BACKEND:    rc = job_backend(arg[0], &result); break;
     case N3G_JOB_BENCH:      rc = job_bench(&result); break;
     case N3G_JOB_META_SCAN:  rc = job_meta_scan(arg[0], arg[1], &result); break;
+    case N3G_JOB_FMSS_PROBE: rc = job_fmss_probe(arg[0], arg[1], &result); break;
 #if N3G_NAND_WRITE
     case N3G_JOB_WRITE_OPEN:
     case N3G_JOB_BLOCK_WRITE:
@@ -1268,6 +1296,7 @@ void n3g_nand_usb_command(const uint32_t *buf, uint32_t *reply)
     case N3G_NAND_BACKEND:    acc = queue(N3G_JOB_BACKEND, buf[1], 0, 0); break;
     case N3G_NAND_BENCH:      acc = queue(N3G_JOB_BENCH, 0, 0, 0); break;
     case N3G_NAND_META_SCAN:  acc = queue(N3G_JOB_META_SCAN, buf[1], buf[2], 0); break;
+    case N3G_NAND_FMSS_PROBE: acc = queue(N3G_JOB_FMSS_PROBE, buf[1], buf[2], 0); break;
     default: reply[0] = 2; return;
     }
     reply[1] = acc;

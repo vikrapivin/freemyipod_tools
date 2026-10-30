@@ -327,6 +327,7 @@ bool usbdebug_handle_data(const struct usb_instance* data, union usb_endpoint_nu
         case N3G_NAND_BACKEND:
         case N3G_NAND_BENCH:
         case N3G_NAND_META_SCAN:
+        case N3G_NAND_FMSS_PROBE:
             n3g_nand_usb_command(buf, dbgbuf);
             break;
 #endif

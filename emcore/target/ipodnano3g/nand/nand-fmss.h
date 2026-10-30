@@ -47,4 +47,59 @@ struct fmss_fault_info {
 extern uint32_t fmss_pc_watch;
 extern struct fmss_fault_info fmss_fault;
 
+/* Probe: run one caller-supplied sequencer program and record what the CPU can see (the registers r0..r7 at 0xc18,
+ * the PC at 0xc38, the register windows before and after, samples taken while it runs). For learning the engine. */
+#define FMSS_PROBE_REQ_MAGIC  0x51525046u   /* "FPRQ" */
+#define FMSS_PROBE_OUT_MAGIC  0x4f525046u   /* "FPRO" */
+#define FMSS_PROBE_MAXPARAMS  96
+#define FMSS_PROBE_MAXSAMPLES 1024
+#define FMSS_PROBE_NWIN       5             /* windows 0x000, 0x400, 0x800, 0xc00, 0xd00; 64 words each */
+#define FMSS_PROBE_KEEP_CTRL0 (1u << 0)     /* leave FMC_CTRL0 as it is (default: 0, no chip enable, before start) */
+#define FMSS_PROBE_WIN400     (1u << 1)     /* also read the 0x400 window (unknown block) */
+#define FMSS_PROBE_SAMPLE_REGS (1u << 2)    /* also read r0..r7 while it runs (default: PC and CS_IRQ only, as the driver) */
+/* start and end steps, each on by default; a flag skips or changes one (experiments on the sequencer's state) */
+#define FMSS_PROBE_NO_CLEAN     (1u << 3)   /* no start-clean of C58 / C4C / C5C before the run */
+#define FMSS_PROBE_NO_PREFLIGHT (1u << 4)   /* no END-only program before the run */
+#define FMSS_PROBE_NO_RESET     (1u << 5)   /* no sequencer reset before the run */
+#define FMSS_PROBE_NO_400       (1u << 6)   /* no FMC +0x400 = 0 before the run */
+#define FMSS_PROBE_END_NOCLEAN  (1u << 7)   /* after the run: park without the clean (reset, END-only program) */
+#define FMSS_PROBE_END_RESET    (1u << 8)   /* after the run: only a sequencer reset (no park at all) */
+#define FMSS_PROBE_WAIT_END   (1u << 14)    /* do not stop at a fault: wait for END (or the timeout); first fault time
+                                               in fault_at_us */
+#define FMSS_PROBE_PROG_SRAM  (1u << 15)    /* run a copy of the program from internal SRAM (at most
+                                               FMSS_PROBE_SRAM_BYTES) instead of from the request buffer */
+#define FMSS_PROBE_SRAM_BYTES 4096
+#define FMSS_PROBE_FULLMAP    (1u << 17)    /* also read all 1024 words of the window (CPU view) into fullmap[0]
+                                               before the start and fullmap[1] after the run (ID FIFO words read 0) */
+#define FMSS_PROBE_CH1_PINS   (1u << 16)    /* switch FMC channel 1's pins (the 0x400 set) to the controller, as the boot
+                                               ROM's channel-1 NAND boot does; restored after the run */
+#define FMSS_PROBE_SNAP_SKIP_SHIFT 9        /* bits 9..13: leave window n (0x000, 0x400, 0x800, 0xc00, 0xd00) out
+                                               of the before-snapshot (reads between the reset and the start) */
+struct fmss_probe_req {                     /* staged by the host */
+    uint32_t magic, version, flags, timeout_us, nparams, prog_bytes;
+    uint32_t late_us, nlate;                /* the last nlate of params[] are written once late_us after the start */
+    uint32_t start_value;                   /* FMSS_CTRL word that starts the program (0: the driver's 0xfff5) */
+    uint32_t late2_us, nlate2;              /* a second batch: the last nlate2 of params[], at late2_us (after the
+                                               first batch, which then is the nlate before them) */
+    struct { uint32_t off, val; } params[FMSS_PROBE_MAXPARAMS];   /* FMC_BASE + off = val, in order, before start */
+};
+struct fmss_probe_sample { uint32_t t_us, pc, r[8]; };
+struct fmss_probe_out {
+    uint32_t magic, version, why, elapsed_us, cs_irq, seq_result, pc, c50;
+    uint32_t prog, nsamples, dropped, polls;
+    uint32_t pre_ok, pre_us, pre_cs_irq, pre_c00;   /* preflight: the END-only program after the setup */
+    uint32_t late_at_us, fault_at_us;       /* when the late writes went out; first CS_IRQ b2 */
+    uint32_t irq_seen, irq_end;             /* VIC1 raw status: OR of every poll / at the end (bit 22 is source 54) */
+    uint32_t late2_at_us, vic0_seen;        /* VIC0 raw status: OR of every poll */
+    uint32_t before[FMSS_PROBE_NWIN][64], after[FMSS_PROBE_NWIN][64];
+    struct fmss_probe_sample s[FMSS_PROBE_MAXSAMPLES];
+    uint32_t fullmap[2][1024];              /* FMSS_PROBE_FULLMAP: the whole window before the start / after the run */
+};
+#define FMSS_PROBE_END      1               /* why: END (CS_IRQ b0) */
+#define FMSS_PROBE_FAULT    2               /* CS_IRQ b2 */
+#define FMSS_PROBE_TIMEOUT  3               /* neither within timeout_us: the sequencer was reset */
+/* prog must be 32-byte aligned and outlive the call; leaves the sequencer parked (END-only program, no chip
+ * enable). Returns 0, or -1 for a bad request. */
+int fmss_probe(const struct fmss_probe_req *q, const uint32_t *prog, struct fmss_probe_out *o);
+
 #endif
