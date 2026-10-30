@@ -72,7 +72,7 @@ class Refused(Exception):
 
 
 # READ_MEM/WRITE_MEM run inside the USB monitor: an access that faults (unmapped VA, absent RAM, an unclocked
-# block) aborts there and the device stops answering (seen in simulation: READ_MEM of 0xfffffffc). Only these
+# block) aborts there and the device stops answering (for example READ_MEM of 0xfffffffc). Only these
 # windows are ever accessed; a rung that probes beyond them says so in its [plan] line and passes allow=True.
 SAFE = [(0x00000000, 0x00030000, "vectors (VA 0 -> SRAM)"), (0x08000000, 0x0c000000, "SDRAM 64 MiB"),
         (0x22000000, 0x22030000, "SRAM, known 192 KiB"),
