@@ -47,6 +47,7 @@
 #define N3G_JOB_WRITE_OPEN 7u
 #define N3G_JOB_BLOCK_WRITE 8u
 #define N3G_JOB_FLUSH      9u
+#define N3G_JOB_BACKEND    10u  /* arg0 = backend index */
 
 /* USB monitor commands (usbdebug.c); numbering follows the nano 5G target.
  * 122, 126, 127 and 132..134 (5G ROM page, reserved, block read, modules)
@@ -60,6 +61,7 @@
 #define N3G_NAND_WRITE_OPEN 129   /* requires an FTL opened writable */
 #define N3G_NAND_BLOCK_WRITE 130  /* {sector, count, CRC32(staged bytes)} */
 #define N3G_NAND_FLUSH      131   /* ftl_sync() */
+#define N3G_NAND_BACKEND    135   /* (index): select the physical backend; invalidates init/FTL */
 
 #define N3G_NAND_HEARTBEAT  200   /* {1, 0, w0, w1} */
 

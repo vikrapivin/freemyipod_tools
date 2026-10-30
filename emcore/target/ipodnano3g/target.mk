@@ -7,6 +7,30 @@ endif
 TARGET_OUTPUT_ipodnano3g := build/ipodnano3g/emcore-nano3g.dfu build/ipodnano3g/emcore-nano3g.bin build/ipodnano3g/emcore-nano3g.nm
 include target/ipodnano3g/stage1.mk
 
+# FMSS sequencer programs of the NAND backend "fmss", assembled on the host
+# with tools/fmssasm.c in its nano 3G mode (-3) into a header of word arrays
+# (fmss3g_readid, fmss3g_read, fmss3g_program, fmss3g_erase).
+N3G_NAND_DIR := target/ipodnano3g/nand
+N3G_NAND_BUILD := build/ipodnano3g/nand
+FMSSASM3G := build/host/fmssasm3g
+FMSS3G_SRC := $(N3G_NAND_DIR)/fmss/readid.s $(N3G_NAND_DIR)/fmss/read.s $(N3G_NAND_DIR)/fmss/program.s $(N3G_NAND_DIR)/fmss/erase.s
+CFLAGS_ipodnano3g += -I$(N3G_NAND_BUILD)
+
+$(FMSSASM3G): tools/fmssasm.c
+	@echo [HOSTCC] $<
+	@mkdir -p $(dir $@)
+	@$(HOSTCC) -O2 -o $@ $<
+
+$(N3G_NAND_BUILD)/fmss-nano3g.h: $(FMSS3G_SRC) $(FMSSASM3G)
+	@echo [FMSSASM] $@
+	@mkdir -p $(dir $@)
+	@$(FMSSASM3G) -3 -p fmss3g_ -i '"libc/include/stdint.h"' -s $@ $(FMSS3G_SRC)
+
+build/ipodnano3g/$(N3G_NAND_DIR)/nand-fmss.o: $(N3G_NAND_BUILD)/fmss-nano3g.h
+
+.PHONY: n3g-fmssasm
+n3g-fmssasm: $(FMSSASM3G)
+
 # Container for the off-device signing step: format 4 (plain body) or 3 (signer encrypts), certificate slot size.
 N3G_IMG1_FORMAT ?= 4
 N3G_IMG1_CERT_LEN ?= 0x300

@@ -24,6 +24,7 @@
 static const struct nand_backend *const nand_backends[NAND_NBACKENDS] =
 {
     &nand_backend_sw,
+    &nand_backend_fmss,
 };
 
 static unsigned int nand_active = NAND_BACKEND_SW;

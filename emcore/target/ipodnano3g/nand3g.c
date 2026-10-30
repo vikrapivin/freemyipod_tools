@@ -39,6 +39,7 @@
 #include "nand/nand-backend.h"
 #include "nand/ftl-target.h"
 #include "nand/nand-chip.h"
+#include "nand/nand-fmss.h"
 
 volatile struct n3g_nand_status n3g_nand_status;
 #define S n3g_nand_status
@@ -57,6 +58,9 @@ static struct { uint32_t kind, arg[3]; } g_job;
 /* ------------------------------------------------------------------ status record */
 static void publish(void)
 {
+    S.fmss_fault_addr = (uint32_t)&fmss_fault;
+    S.fmss_fault_count = fmss_fault.count;
+    S.fmss_fault_pc = fmss_fault.pc;
     commit_dcache_range((const void *)&n3g_nand_status, sizeof(n3g_nand_status));
 }
 
@@ -182,6 +186,17 @@ static uint32_t job_step(uint32_t step, uint32_t arg, uint32_t *result)
     return rc;
 }
 
+static uint32_t job_backend(uint32_t idx, uint32_t *result)
+{
+    if (nand_backend_select(idx)) { *result = N3G_R_BAD_ARG; return 0; }
+    invalidate_ftl();
+    S.step_ok_mask &= ~(1u << N3G_STEP_PHYS);
+    S.step_status[N3G_STEP_PHYS] = N3G_STEP_NOT_RUN;
+    S.backend = idx;
+    geom_from_driver();
+    return 0;
+}
+
 /* ------------------------------------------------------------------ plain reads */
 static uint32_t job_read_page(uint32_t bank, uint32_t page, uint32_t *result)
 {
@@ -271,6 +286,7 @@ static void run_job(uint32_t kind, const uint32_t *arg)
     case N3G_JOB_STEP:       rc = job_step(arg[0], arg[1], &result); break;
     case N3G_JOB_READ_PAGE:  rc = job_read_page(arg[0], arg[1], &result); break;
     case N3G_JOB_FTL_READ:   rc = job_ftl_read(arg[0], arg[1], &result); break;
+    case N3G_JOB_BACKEND:    rc = job_backend(arg[0], &result); break;
 #if N3G_NAND_WRITE
     case N3G_JOB_WRITE_OPEN:
     case N3G_JOB_BLOCK_WRITE:
@@ -388,6 +404,7 @@ void n3g_nand_usb_command(const uint32_t *buf, uint32_t *reply)
     case N3G_NAND_READ_PAGE:  acc = queue(N3G_JOB_READ_PAGE, buf[1], buf[2], 0); break;
     case N3G_NAND_FTL_OPEN:   acc = queue(N3G_JOB_STEP, N3G_STEP_FTL, buf[1], 0); break;
     case N3G_NAND_FTL_READ:   acc = queue(N3G_JOB_FTL_READ, buf[1], buf[2], 0); break;
+    case N3G_NAND_BACKEND:    acc = queue(N3G_JOB_BACKEND, buf[1], 0, 0); break;
     default: reply[0] = 2; return;
     }
     reply[1] = acc;

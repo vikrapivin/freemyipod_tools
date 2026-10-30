@@ -54,9 +54,11 @@ struct nand_backend
 };
 
 #define NAND_BACKEND_SW   0
-#define NAND_NBACKENDS    1
+#define NAND_BACKEND_FMSS 1
+#define NAND_NBACKENDS    2
 
 extern const struct nand_backend nand_backend_sw;
+extern const struct nand_backend nand_backend_fmss;
 
 /* Select the active backend (also resets "initialised"). Returns 0, or
  * NAND_ERR_NOINIT for a bad index. */

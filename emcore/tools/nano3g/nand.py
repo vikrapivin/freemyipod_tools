@@ -35,7 +35,7 @@ JOB_NAMES = {0: "none", 1: "step", 3: "read_page", 4: "ftl_read", 7: "write_open
              9: "flush", 10: "backend", 11: "bench"}
 STEP_NAMES = {1: "clock gates (FMC, ECC)", 2: "NAND pad snapshot", 3: "backend init (reset, READ ID, chip table)",
               4: "FTL mount"}
-BACKENDS = {"sw": 0}
+BACKENDS = {"sw": 0, "fmss": 1}
 BACKEND_NAMES = {v: k for k, v in BACKENDS.items()}
 GEOM_NAMES = ("banks", "blocks_per_bank", "pages_per_block", "planes", "userblocks_per_bank", "vfl_spares",
               "twoplane", "page_bytes", "chip_mode", "layout", "validated", "chip_id")
@@ -202,7 +202,15 @@ def cmd_step(s, a):
     return st
 
 
+def cmd_backend(s, a):
+    st = check(s.job(Cmd.NAND_BACKEND, BACKENDS[a.name]))
+    print("backend %s selected (steps 3 and 4 must be re-run)" % a.name)
+    return st
+
+
 def cmd_init(s, a):
+    if a.backend:
+        cmd_backend(s, argparse.Namespace(name=a.backend))
     for n in (1, 2, 3, 4)[:4 if a.ftl else 3]:
         a.n, a.arg = n, 1 if (n == 4 and a.writable) else 0
         cmd_step(s, a)
@@ -244,6 +252,26 @@ def cmd_ftl_open(s, a):
 FAULT_FIELDS = ["magic", "why", "set", "prog", "pc"] + ["r%d" % i for i in range(8)] + ["c3c", "c50", "cs_irq"] + \
                ["fmc%02x" % (4 * i) for i in range(20)] + ["ecc80c", "ecc810", "ecc814", "ecc840", "count", "pc_last"] + \
                ["pcs%d" % i for i in range(8)] + ["pcsn%d" % i for i in range(8)]
+
+
+def cmd_fault(s, a):
+    """The FMSS sequencer's state at its last fault/timeout (struct fmss_fault_info)"""
+    st = s.status()
+    raw = s.read(st.fmss_fault_addr, 4 * len(FAULT_FIELDS))
+    f = dict(zip(FAULT_FIELDS, struct.unpack("<%dI" % len(FAULT_FIELDS), raw)))
+    if f["magic"] != 0x46464d46:
+        print("no FMSS fault recorded since boot")
+        return
+    print("FMSS %s #%d: program set %d (%s) at 0x%08x, PC 0x%x = instruction %d" % (
+        {1: "fault", 2: "timeout"}.get(f["why"], f["why"]), f["count"], f["set"], "fmss",
+        f["prog"], f["pc"], f["pc"] // 8))
+    print("r0..r7: " + " ".join("%08x" % f["r%d" % i] for i in range(8)))
+    print("C3C %08x  C50 %08x  CS_IRQ %08x" % (f["c3c"], f["c50"], f["cs_irq"]))
+    print("FMC 0x00..0x4c: " + " ".join("%08x" % f["fmc%02x" % (4 * i)] for i in range(20)))
+    print("ECC 80c %08x 810 %08x 814 %08x 840 %08x" % (f["ecc80c"], f["ecc810"], f["ecc814"], f["ecc840"]))
+    print("last PC seen before the fault flag: 0x%x (instruction %d)" % (f["pc_last"], f["pc_last"] // 8))
+    samples = sorted(((f["pcsn%d" % i], f["pcs%d" % i]) for i in range(8) if f["pcsn%d" % i]), reverse=True)
+    print("PC samples while running: " + ", ".join("0x%x (instr %d) x%d" % (pc, pc // 8, n) for n, pc in samples))
 
 
 def cmd_lread(s, a):
@@ -289,7 +317,9 @@ def cmd_flush(s, a):
     print("flushed")
 
 
-HANDLERS = {'status': cmd_status, 'step': cmd_step, 'init': cmd_init, 'id': cmd_id, 'rawread': cmd_rawread, 'ftl-open': cmd_ftl_open, 'lread': cmd_lread, 'write-caps': cmd_write_caps, 'write-open': cmd_write_open, 'lwrite': cmd_lwrite, 'flush': cmd_flush}
+HANDLERS = {"status": cmd_status, "step": cmd_step, "init": cmd_init, "id": cmd_id, "rawread": cmd_rawread,
+            "ftl-open": cmd_ftl_open, "lread": cmd_lread, "backend": cmd_backend, "write-caps": cmd_write_caps, "fault": cmd_fault,
+            "write-open": cmd_write_open, "lwrite": cmd_lwrite, "flush": cmd_flush}
 WRITE_COMMANDS = {"write-open", "lwrite", "flush"}
 
 
@@ -308,11 +338,14 @@ def build_parser():
     p = sub.add_parser("step"); p.add_argument("n", type=int); p.add_argument("--arg", type=ai, default=0)
     p = sub.add_parser("init"); p.add_argument("--ftl", action="store_true", help="also mount the FTL (step 4)")
     p.add_argument("--writable", action="store_true", help="with --ftl: allow the mount to write (restore) and ftl writes")
+    p.add_argument("--backend", choices=tuple(BACKENDS))
     sub.add_parser("id")
     p = sub.add_parser("rawread"); p.add_argument("bank", type=ai); p.add_argument("page", type=ai); p.add_argument("-o", "--output")
     p = sub.add_parser("ftl-open"); p.add_argument("--writable", action="store_true")
     p = sub.add_parser("lread"); p.add_argument("sector", type=ai); p.add_argument("count", type=ai, nargs="?", default=1)
     p.add_argument("-o", "--output")
+    p = sub.add_parser("backend"); p.add_argument("name", choices=tuple(BACKENDS))
+    sub.add_parser("fault", help="FMSS sequencer state at its last fault or timeout")
     sub.add_parser("write-caps")
     sub.add_parser("write-open")
     p = sub.add_parser("lwrite"); p.add_argument("sector", type=ai); p.add_argument("file")

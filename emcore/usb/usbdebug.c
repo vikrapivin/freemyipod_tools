@@ -324,6 +324,7 @@ bool usbdebug_handle_data(const struct usb_instance* data, union usb_endpoint_nu
         case N3G_NAND_WRITE_OPEN:
         case N3G_NAND_BLOCK_WRITE:
         case N3G_NAND_FLUSH:
+        case N3G_NAND_BACKEND:
             n3g_nand_usb_command(buf, dbgbuf);
             break;
 #endif
