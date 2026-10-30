@@ -24,7 +24,7 @@ CFLAGS_ipodnano5g += -DN5G_NAND_DISABLE
 PPCFLAGS_ipodnano5g += -DN5G_NAND_DISABLE
 endif
 
-$(FMSSASM): ../tools/fmssasm.c build/host/fmssasm-config
+$(FMSSASM): tools/fmssasm.c build/host/fmssasm-config
 	@echo [HOSTCC] $<
 	@mkdir -p $(dir $@)
 	@$(HOSTCC) -O2 -o $@ $<
