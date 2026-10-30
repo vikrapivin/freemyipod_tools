@@ -25,6 +25,8 @@
 #include "uart.h"
 #include "s5l8702.h"
 #include "timer.h"
+#include "thread.h"
+#include "clockgates.h"
 
 
 void uart_init()

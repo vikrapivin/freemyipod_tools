@@ -784,7 +784,7 @@ struct dma_lli
 /////CLOCK GATES/////
 #define CLOCKGATE_LCD 1
 #define CLOCKGATE_USB_1 2
-#define CLOCKGATE_DMA(x) 25
+#define CLOCKGATE_DMA(x) ((x) ? 26 : 25)
 #define CLOCKGATE_DMA_0 25
 #define CLOCKGATE_USB_2 35
 #define CLOCKGATE_I2C(x) 36
@@ -798,7 +798,7 @@ struct dma_lli
 /////INTERRUPTS/////
 #define IRQ_TIMER 8
 #define IRQ_USB_FUNC 19
-#define IRQ_DMAC(d) 16 + d
+#define IRQ_DMAC(d) (16 + (d))
 #define IRQ_DMAC0 16
 #define IRQ_DMAC1 17
 #define IRQ_WHEEL 23

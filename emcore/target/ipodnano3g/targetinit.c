@@ -26,6 +26,9 @@
 #include "clickwheel.h"
 #include "clockgates.h"
 #include "s5l8702.h"
+#include "console.h"
+#include "thread.h"
+#include "malloc.h"
 
 
 #define sysi ((uint8_t*)0x2203fdf8)
@@ -63,7 +66,7 @@ void targetinit_late()
         sysiword[0] = 0x53797349;
         sysiword[1] = 4;
         sysiword[0x22] = 0x414e;
-        sysiword[0x38] = 0x4000000;
+        sysiword[0x38] = 0x2000000;   /* 32 MiB SDRAM on the nano 3G (the classic has 64) */
         sysiword[0x39] = 0x8000000;
         sysiword[0x3a] = 0x40000;
         sysiword[0x3b] = 0x22000000;

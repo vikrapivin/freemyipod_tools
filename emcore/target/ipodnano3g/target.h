@@ -30,8 +30,8 @@
 
 #define ARM_ARCH 5
 #define LITTLE_ENDIAN
-#define CACHEALIGN_BITS 4
-#define CPU_FREQ 191692800
+#define CACHEALIGN_BITS 5   /* ARM926EJ-S: 32-byte D-cache lines (osos mem:0x08025754 clean loop step 0x20) */
+#define CPU_FREQ 216000000   /* stage1: PLL2 216 MHz, CClk = FClk */
 
 
 #define CONSOLE_BOOT 3
