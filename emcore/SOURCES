@@ -59,6 +59,7 @@ target/ipodnano3g/uart.c
 target/ipodnano3g/nand3g.c
 target/ipodnano3g/nand/nand-backend.c
 target/ipodnano3g/nand/nand-swnand.c
+target/ipodnano3g/nand/ftl-nano3g.c
 #endif
 target/ipodnano2g/rtc.c
 usb/synopsysotg.c

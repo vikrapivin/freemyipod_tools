@@ -31,8 +31,10 @@ MAGIC, VERSION, STATUS_BYTES = 0x4e47334e, 1, 0x110
 STATE_NAMES = {0: "IDLE", 1: "QUEUED", 2: "RUNNING", 3: "DONE"}
 RESULT_NAMES = {0: "OK", 1: "LIB_ERROR", 2: "PRECOND", 3: "BAD_ARG", 4: "NO_MEMORY", 5: "NOT_ALLOWED"}
 ACCEPT_NAMES = {0: "OK", 1: "BUSY", 2: "BAD_ARG", 3: "NOT_INIT"}
-JOB_NAMES = {0: "none", 1: "step", 3: "read_page"}
-STEP_NAMES = {1: "clock gates (FMC, ECC)", 2: "NAND pad snapshot", 3: "backend init (reset, READ ID, chip table)"}
+JOB_NAMES = {0: "none", 1: "step", 3: "read_page", 4: "ftl_read", 7: "write_open", 8: "block_write",
+             9: "flush", 10: "backend", 11: "bench"}
+STEP_NAMES = {1: "clock gates (FMC, ECC)", 2: "NAND pad snapshot", 3: "backend init (reset, READ ID, chip table)",
+              4: "FTL mount"}
 BACKENDS = {"sw": 0}
 BACKEND_NAMES = {v: k for k, v in BACKENDS.items()}
 GEOM_NAMES = ("banks", "blocks_per_bank", "pages_per_block", "planes", "userblocks_per_bank", "vfl_spares",
@@ -201,8 +203,8 @@ def cmd_step(s, a):
 
 
 def cmd_init(s, a):
-    for n in (1, 2, 3):
-        a.n, a.arg = n, 0
+    for n in (1, 2, 3, 4)[:4 if a.ftl else 3]:
+        a.n, a.arg = n, 1 if (n == 4 and a.writable) else 0
         cmd_step(s, a)
     return cmd_id(s, a)
 
@@ -234,12 +236,61 @@ def cmd_rawread(s, a):
     return st, data, meta, ecc
 
 
+def cmd_ftl_open(s, a):
+    a.n, a.arg = 4, 1 if a.writable else 0
+    return cmd_step(s, a)
+
+
 FAULT_FIELDS = ["magic", "why", "set", "prog", "pc"] + ["r%d" % i for i in range(8)] + ["c3c", "c50", "cs_irq"] + \
                ["fmc%02x" % (4 * i) for i in range(20)] + ["ecc80c", "ecc810", "ecc814", "ecc840", "count", "pc_last"] + \
                ["pcs%d" % i for i in range(8)] + ["pcsn%d" % i for i in range(8)]
 
 
-HANDLERS = {'status': cmd_status, 'step': cmd_step, 'init': cmd_init, 'id': cmd_id, 'rawread': cmd_rawread}
+def cmd_lread(s, a):
+    st = s.status()
+    if not st.ftl_sectors:
+        raise ToolError("FTL not mounted: run 'n3g.py nand init --ftl' first")
+    count = a.count
+    if count * SECTOR_BYTES > min(RESULT_BYTES, st.result_cap):
+        raise ToolError("count too large for the result buffer (max %d sectors)" % (RESULT_BYTES // SECTOR_BYTES))
+    st = check(s.job(Cmd.NAND_FTL_READ, a.sector, count, timeout=a.timeout or 60.0))
+    data = s.result(st, count * SECTOR_BYTES)
+    if a.output:
+        open(a.output, "wb").write(data)
+        print("wrote %s (%d bytes)" % (a.output, len(data)))
+    else:
+        print(hexdump(data, limit=256))
+    return data
+
+
+def cmd_write_caps(s, a):
+    proto, flags, maxsec = s.cmd(Cmd.NAND_WRITE_CAPS)
+    print("write protocol %d, writer %s, max %d sectors per write" % (proto, "yes" if flags & 1 else "no", maxsec))
+
+
+def cmd_write_open(s, a):
+    check(s.job(Cmd.NAND_WRITE_OPEN))
+    print("writer open")
+
+
+def cmd_lwrite(s, a):
+    data = open(a.file, "rb").read()
+    if len(data) % SECTOR_BYTES:
+        raise ToolError("file size must be a multiple of %d" % SECTOR_BYTES)
+    count = len(data) // SECTOR_BYTES
+    st = s.status()
+    s.write_memory(st.result_addr, data)
+    check(s.job(Cmd.NAND_BLOCK_WRITE, a.sector, count, d=zlib.crc32(data) & 0xffffffff, timeout=a.timeout or 120.0))
+    print("wrote %d sectors at %d (not committed until flush)" % (count, a.sector))
+
+
+def cmd_flush(s, a):
+    check(s.job(Cmd.NAND_FLUSH, timeout=a.timeout or 120.0))
+    print("flushed")
+
+
+HANDLERS = {'status': cmd_status, 'step': cmd_step, 'init': cmd_init, 'id': cmd_id, 'rawread': cmd_rawread, 'ftl-open': cmd_ftl_open, 'lread': cmd_lread, 'write-caps': cmd_write_caps, 'write-open': cmd_write_open, 'lwrite': cmd_lwrite, 'flush': cmd_flush}
+WRITE_COMMANDS = {"write-open", "lwrite", "flush"}
 
 
 def ai(x):
@@ -255,9 +306,17 @@ def build_parser():
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("status")
     p = sub.add_parser("step"); p.add_argument("n", type=int); p.add_argument("--arg", type=ai, default=0)
-    p = sub.add_parser("init")
+    p = sub.add_parser("init"); p.add_argument("--ftl", action="store_true", help="also mount the FTL (step 4)")
+    p.add_argument("--writable", action="store_true", help="with --ftl: allow the mount to write (restore) and ftl writes")
     sub.add_parser("id")
     p = sub.add_parser("rawread"); p.add_argument("bank", type=ai); p.add_argument("page", type=ai); p.add_argument("-o", "--output")
+    p = sub.add_parser("ftl-open"); p.add_argument("--writable", action="store_true")
+    p = sub.add_parser("lread"); p.add_argument("sector", type=ai); p.add_argument("count", type=ai, nargs="?", default=1)
+    p.add_argument("-o", "--output")
+    sub.add_parser("write-caps")
+    sub.add_parser("write-open")
+    p = sub.add_parser("lwrite"); p.add_argument("sector", type=ai); p.add_argument("file")
+    sub.add_parser("flush")
     return ap
 
 

@@ -19,8 +19,12 @@
 
 
 //
-/* Nano3g NAND worker: queue raw-page reads and initialization steps over USB.
- * Boot creates the worker and result buffer; hardware initialization is explicit. */
+/* Nano3g NAND worker. USB commands queue jobs and return immediately; hosts
+ * poll the status record and retrieve data from the result buffer. Boot only
+ * creates the worker. Backend initialization and FTL mounting occur on
+ * explicit commands. Everything is read-only unless a command says
+ * otherwise: the FTL mounts read-only unless step 4 gets argument 1, and the
+ * raw write benchmark needs N3G_BF_WRITE. */
 #include "global.h"
 #include "thread.h"
 #include "timer.h"
@@ -33,6 +37,7 @@
 #include "nand/nand-compat.h"
 #include "nand/nand-target.h"
 #include "nand/nand-backend.h"
+#include "nand/ftl-target.h"
 #include "nand/nand-chip.h"
 
 volatile struct n3g_nand_status n3g_nand_status;
@@ -45,7 +50,8 @@ static struct scheduler_thread g_thread;
 static struct wakeup g_wake;
 static uint8_t *g_result;                 /* N3G_RESULT_BYTES */
 static uint32_t *g_meta;                  /* 4 words of spare metadata */
-static int g_ready;
+static int g_ready, g_ftl_ready;
+static int g_write_ready, g_write_poisoned;   /* writer state of the current mount (jobs 7..9) */
 static struct { uint32_t kind, arg[3]; } g_job;
 
 /* ------------------------------------------------------------------ status record */
@@ -100,6 +106,15 @@ static void snap_pcon(void)
     S.pcon[2] = PCON(10);
 }
 
+static void invalidate_ftl(void)
+{
+    g_ftl_ready = 0;
+    S.step_ok_mask &= ~(1u << N3G_STEP_FTL);
+    S.ftl_sectors = 0;
+    S.ftl_sector_bytes = 0;
+    S.ftl_writable = 0;
+}
+
 /* ------------------------------------------------------------------ steps */
 static int need(uint32_t mask) { return (S.step_ok_mask & mask) == mask; }
 
@@ -115,6 +130,7 @@ static uint32_t step_gates(void)
 static uint32_t step_phys(void)
 {
     int rc;
+    invalidate_ftl();
     rc = nand_backend_init();
     geom_from_driver();
     snap_pcon();
@@ -123,17 +139,42 @@ static uint32_t step_phys(void)
     return (uint32_t)rc;
 }
 
+static uint32_t step_ftl(uint32_t writable)
+{
+    int rc;
+    ftl_mount_writable = (writable & 1) != 0;
+    ftl_allow_unvalidated = (writable & 2) != 0;
+    g_write_ready = 0;          /* every mount starts a new writer session */
+    g_write_poisoned = 0;
+    rc = ftl_init();
+    if (rc == 0) {
+        S.ftl_sectors = ftl_num_sectors();
+        S.ftl_sector_bytes = N3G_SECTOR_BYTES;
+        S.ftl_writable = !ftl_readonly_mount();
+        S.job_detail[0] = S.ftl_sectors;
+        S.job_detail[1] = N3G_SECTOR_BYTES;
+        S.job_detail[2] = S.ftl_writable;
+        g_ftl_ready = S.ftl_sectors != 0;
+        if (!g_ftl_ready) rc = NAND_ERR_FTL;
+    } else {
+        g_ftl_ready = 0;
+    }
+    return (uint32_t)rc;
+}
+
 static uint32_t job_step(uint32_t step, uint32_t arg, uint32_t *result)
 {
     uint32_t rc;
-    if (step == 0 || step > N3G_STEP_PHYS) { *result = N3G_R_BAD_ARG; return 0; }
-    if (step == N3G_STEP_PHYS && !need(1u << N3G_STEP_GATES)) { *result = N3G_R_PRECOND; return 0; }
+    if (step == 0 || step > N3G_STEP_FTL) { *result = N3G_R_BAD_ARG; return 0; }
+    if ((step == N3G_STEP_PHYS && !need(1u << N3G_STEP_GATES)) ||
+        (step == N3G_STEP_FTL && !need(1u << N3G_STEP_PHYS))) { *result = N3G_R_PRECOND; return 0; }
     S.step_status[step] = N3G_STEP_RUNNING;
     publish();
     switch (step) {
     case N3G_STEP_GATES: rc = step_gates(); break;
     case N3G_STEP_PINS:  snap_pcon(); rc = 0; break;
     case N3G_STEP_PHYS:  rc = step_phys(); break;
+    default:             rc = step_ftl(arg); break;
     }
     S.step_status[step] = rc;
     if (rc == 0) S.step_ok_mask |= 1u << step;
@@ -164,6 +205,56 @@ static uint32_t job_read_page(uint32_t bank, uint32_t page, uint32_t *result)
     return (uint32_t)rc;
 }
 
+static uint32_t job_ftl_read(uint32_t lpn, uint32_t count, uint32_t *result)
+{
+    uint32_t done = 0, worst = 0, total = S.ftl_sectors;
+    if (!g_ftl_ready) { *result = N3G_R_PRECOND; return 0; }
+    if (count == 0 || count * N3G_SECTOR_BYTES > N3G_RESULT_BYTES || lpn >= total || count > total - lpn) {
+        *result = N3G_R_BAD_ARG; return 0;
+    }
+    S.progress_total = count;
+    S.job_detail[1] = 0xffffffffu;
+    while (done < count) {
+        uint32_t n = count - done > N3G_FTL_CHUNK ? N3G_FTL_CHUNK : count - done;
+        int rc = ftl_read(lpn + done, n, g_result + done * N3G_SECTOR_BYTES);
+        if (rc != 0) {
+            worst = (uint32_t)rc;
+            S.job_detail[1] = lpn + done;
+            break;
+        }
+        done += n;
+        S.progress_done = done;
+    }
+    S.job_detail[0] = worst;
+    S.result_len = done * N3G_SECTOR_BYTES;
+    if (worst != 0) *result = N3G_R_LIB_ERROR;
+    return worst;
+}
+
+#if N3G_NAND_WRITE
+static uint32_t job_write(uint32_t kind, const uint32_t *arg, uint32_t *result)
+{
+    int rc = 0;
+    if (!g_ftl_ready || g_write_poisoned || (kind != N3G_JOB_WRITE_OPEN && !g_write_ready)) {
+        *result = N3G_R_PRECOND; return 0;
+    }
+    if (kind == N3G_JOB_BLOCK_WRITE) {
+        uint32_t lba = arg[0], count = arg[1];
+        if (!count || count > N3G_RESULT_BYTES / N3G_SECTOR_BYTES || lba >= S.ftl_sectors ||
+            count > S.ftl_sectors - lba || crc32(g_result, count * N3G_SECTOR_BYTES) != arg[2]) {
+            *result = N3G_R_BAD_ARG; return 0;
+        }
+        S.progress_total = count;
+        rc = ftl_write(lba, count, g_result);
+        if (!rc) S.progress_done = count;
+    } else if (kind == N3G_JOB_WRITE_OPEN) {
+        if (ftl_readonly_mount()) { *result = N3G_R_NOT_ALLOWED; return 0; }
+        g_write_ready = 1;
+    } else rc = ftl_sync();
+    if (rc) { g_write_poisoned = 1; *result = N3G_R_LIB_ERROR; }
+    return (uint32_t)rc;
+}
+#endif
 
 static void run_job(uint32_t kind, const uint32_t *arg)
 {
@@ -179,6 +270,12 @@ static void run_job(uint32_t kind, const uint32_t *arg)
     switch (kind) {
     case N3G_JOB_STEP:       rc = job_step(arg[0], arg[1], &result); break;
     case N3G_JOB_READ_PAGE:  rc = job_read_page(arg[0], arg[1], &result); break;
+    case N3G_JOB_FTL_READ:   rc = job_ftl_read(arg[0], arg[1], &result); break;
+#if N3G_NAND_WRITE
+    case N3G_JOB_WRITE_OPEN:
+    case N3G_JOB_BLOCK_WRITE:
+    case N3G_JOB_FLUSH:      rc = job_write(kind, arg, &result); break;
+#endif
     default:                 result = N3G_R_BAD_ARG; break;
     }
     if (S.result_len) commit_dcache_range(g_result, S.result_len);
@@ -273,6 +370,14 @@ void n3g_nand_usb_command(const uint32_t *buf, uint32_t *reply)
     uint32_t acc;
     reply[0] = 1;
     switch (buf[0]) {
+    case N3G_NAND_WRITE_CAPS:
+        reply[1] = 1; reply[2] = N3G_NAND_WRITE ? 1 : 0;
+        reply[3] = N3G_RESULT_BYTES / N3G_SECTOR_BYTES; return;
+#if N3G_NAND_WRITE
+    case N3G_NAND_WRITE_OPEN:  acc = queue(N3G_JOB_WRITE_OPEN, 0, 0, 0); break;
+    case N3G_NAND_BLOCK_WRITE: acc = queue(N3G_JOB_BLOCK_WRITE, buf[1], buf[2], buf[3]); break;
+    case N3G_NAND_FLUSH:       acc = queue(N3G_JOB_FLUSH, 0, 0, 0); break;
+#endif
     case N3G_NAND_STATUS:     /* -> {status record address, size, result buffer address} */
         if (g_ready) refresh_live();
         reply[1] = (uint32_t)&n3g_nand_status;
@@ -281,6 +386,8 @@ void n3g_nand_usb_command(const uint32_t *buf, uint32_t *reply)
         return;
     case N3G_NAND_STEP:       acc = queue(N3G_JOB_STEP, buf[1], buf[2], 0); break;
     case N3G_NAND_READ_PAGE:  acc = queue(N3G_JOB_READ_PAGE, buf[1], buf[2], 0); break;
+    case N3G_NAND_FTL_OPEN:   acc = queue(N3G_JOB_STEP, N3G_STEP_FTL, buf[1], 0); break;
+    case N3G_NAND_FTL_READ:   acc = queue(N3G_JOB_FTL_READ, buf[1], buf[2], 0); break;
     default: reply[0] = 2; return;
     }
     reply[1] = acc;

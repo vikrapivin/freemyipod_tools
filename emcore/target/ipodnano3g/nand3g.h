@@ -25,6 +25,10 @@
 #define N3G_NAND_H
 #include "libc/include/stdint.h"
 
+#ifndef N3G_NAND_WRITE
+#define N3G_NAND_WRITE 1
+#endif
+
 #define N3G_NAND_MAGIC    0x4e47334eu   /* "N3GN" little endian */
 #define N3G_NAND_VERSION  1u
 
@@ -32,11 +36,17 @@
 #define N3G_STEP_GATES    1u   /* FMC + ECC clock gates open (PWRCON0 bits 8 and 12) */
 #define N3G_STEP_PINS     2u   /* snapshot of the NAND pad words PCON(8..10); read only */
 #define N3G_STEP_PHYS     3u   /* active backend init: reset + READ ID per bank, chip table match, geometry */
+#define N3G_STEP_FTL      4u   /* ftl_init(); arg bit 0: allow the mount to write (restore) and ftl_write;
+                                  bit 1: also on a chip row not validated on hardware */
 #define N3G_NSTEPS        8u
 
 #define N3G_JOB_NONE       0u
 #define N3G_JOB_STEP       1u   /* arg0 = step, arg1 = step argument */
 #define N3G_JOB_READ_PAGE  3u   /* arg0 = bank, arg1 = page (row within the bank) */
+#define N3G_JOB_FTL_READ   4u   /* arg0 = sector, arg1 = count (2048-byte FTL sectors) */
+#define N3G_JOB_WRITE_OPEN 7u
+#define N3G_JOB_BLOCK_WRITE 8u
+#define N3G_JOB_FLUSH      9u
 
 /* USB monitor commands (usbdebug.c); numbering follows the nano 5G target.
  * 122, 126, 127 and 132..134 (5G ROM page, reserved, block read, modules)
@@ -44,6 +54,12 @@
 #define N3G_NAND_STATUS     120   /* -> {1, &n3g_nand_status, size, result buffer} */
 #define N3G_NAND_STEP       121   /* (step, arg) */
 #define N3G_NAND_READ_PAGE  123   /* (bank, page) */
+#define N3G_NAND_FTL_OPEN   124   /* (writable) == step 4 */
+#define N3G_NAND_FTL_READ   125   /* (sector, count) */
+#define N3G_NAND_WRITE_CAPS 128   /* -> {protocol=1, flags(bit0=writer), max sectors per write} */
+#define N3G_NAND_WRITE_OPEN 129   /* requires an FTL opened writable */
+#define N3G_NAND_BLOCK_WRITE 130  /* {sector, count, CRC32(staged bytes)} */
+#define N3G_NAND_FLUSH      131   /* ftl_sync() */
 
 #define N3G_NAND_HEARTBEAT  200   /* {1, 0, w0, w1} */
 
@@ -69,6 +85,7 @@
 
 #define N3G_RESULT_BYTES  (256u * 1024u)
 #define N3G_SECTOR_BYTES  2048u
+#define N3G_FTL_CHUNK     16u   /* FTL sectors per ftl_read() call of the read job */
 
 /* READ_PAGE result layout inside the result buffer */
 #define N3G_RP_DATA     0x0000u   /* page data: pagesize (2048 / 4096) */
