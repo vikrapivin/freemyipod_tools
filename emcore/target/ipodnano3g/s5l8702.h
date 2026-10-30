@@ -537,7 +537,9 @@ struct dma_lli
 #define LCDCON    (*((uint32_t volatile*)(0x38300000)))
 #define LCDWCMD   (*((uint32_t volatile*)(0x38300004)))
 #define LCDSTATUS (*((uint32_t volatile*)(0x3830001c)))
-#define LCDPHTIME (*((uint32_t volatile*)(0x38300010)))
+#define LCDRDATA  (*((uint32_t volatile*)(0x38300010)))
+#define LCDDBUFF  (*((uint32_t volatile*)(0x38300014)))
+#define LCDPHTIME (*((uint32_t volatile*)(0x38300020)))
 #define LCDWDATA  (*((uint32_t volatile*)(0x38300040)))
 
 /////ATA/////

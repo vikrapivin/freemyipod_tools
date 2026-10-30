@@ -27,7 +27,11 @@
 #include "s5l8702.h"
 #include "util.h"
 #include "clockgates-target.h"
+#include "clockgates.h"
 #include "lcd.h"
+#include "mmu.h"
+#include "lcdconsole.h"
+#include "timer.h"
 
 
 static struct dma_lli lcd_lli[(LCD_WIDTH * LCD_HEIGHT - 1) / 0xfff]
@@ -61,6 +65,260 @@ int lcd_get_format()
     return LCD_FORMAT;
 }
 
+/* Panel support follows Apple's iPod OS (osos 1.1.3): the panel types and their ID bytes (osos mem:0x08098764,
+ * 6 tries 10 ms apart: mem:0x0809e700), the LCD controller setup (mem:0x080c95b8: frame mode 0x81100db9, +0x7c =
+ * 0x402, +0x88 = 0x01000000, PHTIME 0x33), command mode as Apple derives it from the frame word (0x81000c21), the
+ * per-window commands (mem:0x080d6510: 0x36 memory access control, 0x2a, 0x2b, 0x2c) and the per-panel register
+ * values, delays, display-on order and GRAM clears of the init and sleep sequences in its panel tables (osos file
+ * 0x9ef85c..0x9efb2d). Apple's OS only re-runs an init after a power-down; at boot its bootloader has done it, which
+ * from DFU nobody has, so emCORE runs it here. Rockbox's lcd-nano3g.c (GPLv2+) was the first version of this driver
+ * and agrees except: 38d5 e0[3], 58xx eb[3], 58xx sleep (0x28), 38c4 sleep delay, display-on order, GRAM clears. */
+#define LCD_MODE_CMD   0x81000c21   /* commands and parameters, 8-bit */
+#define LCD_MODE_FRAME 0x81100db9   /* RGB565 frame data on the 9-bit bus */
+#define LCDREG(off)    (*((uint32_t volatile*)(0x38300000 + (off))))
+
+enum { SEQ_CMD = 0, SEQ_SLEEP, SEQ_CLEAR, SEQ_END = 0xff };   /* SEQ_SLEEP unit: 1 ms; SEQ_CLEAR: GRAM = 0xffff */
+
+enum
+{
+    LCD_TYPE_UNKNOWN = -1,
+    LCD_TYPE_38B3 = 0,
+    LCD_TYPE_38C4,
+    LCD_TYPE_38D5,
+    LCD_TYPE_38E6,
+    LCD_TYPE_58XX,
+};
+
+/* Per-panel register values, from the iPod OS panel tables. 38e6 is 38b3 with c0 = 0x0a and c5[0] = 0x38, as the
+ * OS patches it after reading that ID. */
+/* 38b3 */
+static const uint8_t lcd_init_seq_0[] INITCONST_ATTR =
+{
+    SEQ_CMD, 0xef, 1, 0x80,
+    SEQ_CMD, 0xc0, 1, 0x06,
+    SEQ_CMD, 0xc1, 1, 0x03,
+    SEQ_CMD, 0xc2, 2, 0x12, 0x00,
+    SEQ_CMD, 0xc3, 2, 0x12, 0x00,
+    SEQ_CMD, 0xc4, 2, 0x12, 0x00,
+    SEQ_CMD, 0xc5, 2, 0x40, 0x38,
+    SEQ_CMD, 0xb1, 2, 0x5f, 0x3f,
+    SEQ_CMD, 0xb2, 2, 0x5f, 0x3f,
+    SEQ_CMD, 0xb3, 2, 0x5f, 0x3f,
+    SEQ_CMD, 0xb4, 1, 0x02,
+    SEQ_CMD, 0xb6, 2, 0x12, 0x02,
+    SEQ_CMD, 0x35, 1, 0x00,
+    SEQ_CMD, 0x26, 1, 0x10,
+    SEQ_CMD, 0xfe, 1, 0x00,
+    SEQ_CMD, 0xe0, 11, 0x0f, 0x70, 0x47, 0x03, 0x02, 0x02, 0xa0, 0x94, 0x05, 0x00, 0x0e,
+    SEQ_CMD, 0xe1, 11, 0x02, 0x43, 0x77, 0x00, 0x0f, 0x05, 0x49, 0x0a, 0x02, 0x0e, 0x00,
+    SEQ_CMD, 0xe2, 11, 0x2f, 0x63, 0x20, 0x50, 0x00, 0x07, 0xd1, 0x13, 0x00, 0x00, 0x0e,
+    SEQ_CMD, 0xe3, 11, 0x50, 0x20, 0x60, 0x23, 0x0f, 0x00, 0x31, 0x1d, 0x07, 0x0e, 0x00,
+    SEQ_CMD, 0xe4, 11, 0x5e, 0x50, 0x65, 0x27, 0x00, 0x0b, 0xdf, 0xf1, 0x01, 0x00, 0x0e,
+    SEQ_CMD, 0xe5, 11, 0x20, 0x67, 0x55, 0x50, 0x0e, 0x01, 0x1f, 0xfd, 0x0b, 0x0e, 0x00,
+    SEQ_CMD, 0x3a, 1, 0x06,
+    SEQ_CMD, 0x13, 0,
+    SEQ_CLEAR,
+    SEQ_CMD, 0x29, 0,
+    SEQ_SLEEP, 1,
+    SEQ_CMD, 0x11, 0,
+    SEQ_SLEEP, 120,
+    SEQ_CMD, 0x29, 0,
+    SEQ_SLEEP, 1,
+    SEQ_END
+};
+
+/* 38c4 */
+static const uint8_t lcd_init_seq_1[] INITCONST_ATTR =
+{
+    SEQ_CMD, 0x01, 0,
+    SEQ_SLEEP, 5,
+    SEQ_CMD, 0xc0, 1, 0x01,
+    SEQ_CMD, 0xc1, 1, 0x03,
+    SEQ_CMD, 0xc2, 2, 0x74, 0x00,
+    SEQ_CMD, 0xc3, 2, 0x72, 0x03,
+    SEQ_CMD, 0xc4, 2, 0x73, 0x03,
+    SEQ_CMD, 0xc5, 2, 0x3c, 0x3c,
+    SEQ_CMD, 0xb1, 2, 0x6a, 0x15,
+    SEQ_CMD, 0xb2, 2, 0x6a, 0x15,
+    SEQ_CMD, 0xb3, 2, 0x6a, 0x15,
+    SEQ_CMD, 0xb4, 1, 0x02,
+    SEQ_CMD, 0xb6, 2, 0x12, 0x02,
+    SEQ_CMD, 0x35, 1, 0x00,
+    SEQ_CMD, 0x26, 1, 0x10,
+    SEQ_CMD, 0xe0, 11, 0x1e, 0x22, 0x44, 0x00, 0x09, 0x01, 0x47, 0xc1, 0x05, 0x02, 0x09,
+    SEQ_CMD, 0xe1, 11, 0x0f, 0x32, 0x35, 0x00, 0x03, 0x05, 0x5e, 0x78, 0x03, 0x00, 0x03,
+    SEQ_CMD, 0xe2, 11, 0x0d, 0x74, 0x47, 0x41, 0x07, 0x01, 0x74, 0x41, 0x09, 0x03, 0x07,
+    SEQ_CMD, 0xe3, 11, 0x5f, 0x41, 0x27, 0x02, 0x00, 0x03, 0x43, 0x55, 0x02, 0x00, 0x03,
+    SEQ_CMD, 0xe4, 11, 0x1b, 0x53, 0x44, 0x51, 0x0b, 0x01, 0x64, 0x20, 0x05, 0x02, 0x09,
+    SEQ_CMD, 0xe5, 11, 0x7f, 0x41, 0x26, 0x02, 0x04, 0x00, 0x33, 0x35, 0x01, 0x00, 0x02,
+    SEQ_CMD, 0x3a, 1, 0x66,
+    SEQ_CLEAR,
+    SEQ_CMD, 0x29, 0,
+    SEQ_SLEEP, 1,
+    SEQ_CMD, 0x11, 0,
+    SEQ_SLEEP, 120,
+    SEQ_CMD, 0x29, 0,
+    SEQ_SLEEP, 1,
+    SEQ_END
+};
+
+/* 38d5 */
+static const uint8_t lcd_init_seq_2[] INITCONST_ATTR =
+{
+    SEQ_CMD, 0xfe, 1, 0x00,
+    SEQ_CMD, 0xc0, 1, 0x00,
+    SEQ_CMD, 0xc1, 1, 0x03,
+    SEQ_CMD, 0xc2, 2, 0x73, 0x03,
+    SEQ_CMD, 0xc3, 2, 0x73, 0x03,
+    SEQ_CMD, 0xc4, 2, 0x73, 0x03,
+    SEQ_CMD, 0xc5, 2, 0x64, 0x37,
+    SEQ_CMD, 0xb1, 2, 0x69, 0x13,
+    SEQ_CMD, 0xb2, 2, 0x69, 0x13,
+    SEQ_CMD, 0xb3, 2, 0x69, 0x13,
+    SEQ_CMD, 0xb4, 1, 0x02,
+    SEQ_CMD, 0xb6, 2, 0x03, 0x12,
+    SEQ_CMD, 0x35, 1, 0x00,
+    SEQ_CMD, 0x26, 1, 0x10,
+    SEQ_CMD, 0xe0, 11, 0x08, 0x00, 0x10, 0x20, 0x03, 0x0e, 0xc8, 0x65, 0x05, 0x00, 0x00,
+    SEQ_CMD, 0xe1, 11, 0x06, 0x20, 0x00, 0x00, 0x00, 0x07, 0x4d, 0x0b, 0x08, 0x00, 0x00,
+    SEQ_CMD, 0xe2, 11, 0x08, 0x77, 0x27, 0x63, 0x0f, 0x16, 0xcf, 0x25, 0x03, 0x00, 0x00,
+    SEQ_CMD, 0xe3, 11, 0x5f, 0x53, 0x77, 0x06, 0x00, 0x02, 0x4b, 0x7b, 0x0f, 0x00, 0x00,
+    SEQ_CMD, 0xe4, 11, 0x08, 0x46, 0x57, 0x52, 0x0f, 0x16, 0xcf, 0x25, 0x04, 0x00, 0x00,
+    SEQ_CMD, 0xe5, 11, 0x6f, 0x42, 0x57, 0x06, 0x00, 0x04, 0x43, 0x7b, 0x0f, 0x00, 0x00,
+    SEQ_CMD, 0x3a, 1, 0x66,
+    SEQ_CLEAR,
+    SEQ_CMD, 0x29, 0,
+    SEQ_SLEEP, 1,
+    SEQ_CMD, 0x11, 0,
+    SEQ_SLEEP, 120,
+    SEQ_CMD, 0x29, 0,
+    SEQ_SLEEP, 1,
+    SEQ_END
+};
+
+/* 38e6 */
+static const uint8_t lcd_init_seq_3[] INITCONST_ATTR =
+{
+    SEQ_CMD, 0xef, 1, 0x80,
+    SEQ_CMD, 0xc0, 1, 0x0a,
+    SEQ_CMD, 0xc1, 1, 0x03,
+    SEQ_CMD, 0xc2, 2, 0x12, 0x00,
+    SEQ_CMD, 0xc3, 2, 0x12, 0x00,
+    SEQ_CMD, 0xc4, 2, 0x12, 0x00,
+    SEQ_CMD, 0xc5, 2, 0x38, 0x38,
+    SEQ_CMD, 0xb1, 2, 0x5f, 0x3f,
+    SEQ_CMD, 0xb2, 2, 0x5f, 0x3f,
+    SEQ_CMD, 0xb3, 2, 0x5f, 0x3f,
+    SEQ_CMD, 0xb4, 1, 0x02,
+    SEQ_CMD, 0xb6, 2, 0x12, 0x02,
+    SEQ_CMD, 0x35, 1, 0x00,
+    SEQ_CMD, 0x26, 1, 0x10,
+    SEQ_CMD, 0xfe, 1, 0x00,
+    SEQ_CMD, 0xe0, 11, 0x0f, 0x70, 0x47, 0x03, 0x02, 0x02, 0xa0, 0x94, 0x05, 0x00, 0x0e,
+    SEQ_CMD, 0xe1, 11, 0x02, 0x43, 0x77, 0x00, 0x0f, 0x05, 0x49, 0x0a, 0x02, 0x0e, 0x00,
+    SEQ_CMD, 0xe2, 11, 0x2f, 0x63, 0x20, 0x50, 0x00, 0x07, 0xd1, 0x13, 0x00, 0x00, 0x0e,
+    SEQ_CMD, 0xe3, 11, 0x50, 0x20, 0x60, 0x23, 0x0f, 0x00, 0x31, 0x1d, 0x07, 0x0e, 0x00,
+    SEQ_CMD, 0xe4, 11, 0x5e, 0x50, 0x65, 0x27, 0x00, 0x0b, 0xdf, 0xf1, 0x01, 0x00, 0x0e,
+    SEQ_CMD, 0xe5, 11, 0x20, 0x67, 0x55, 0x50, 0x0e, 0x01, 0x1f, 0xfd, 0x0b, 0x0e, 0x00,
+    SEQ_CMD, 0x3a, 1, 0x06,
+    SEQ_CMD, 0x13, 0,
+    SEQ_CLEAR,
+    SEQ_CMD, 0x29, 0,
+    SEQ_SLEEP, 1,
+    SEQ_CMD, 0x11, 0,
+    SEQ_SLEEP, 120,
+    SEQ_CMD, 0x29, 0,
+    SEQ_SLEEP, 1,
+    SEQ_END
+};
+
+/* 58xx */
+static const uint8_t lcd_init_seq_4[] INITCONST_ATTR =
+{
+    SEQ_CMD, 0xe1, 3, 0x0f, 0x31, 0x04,
+    SEQ_CMD, 0xe2, 5, 0x02, 0xa2, 0x08, 0x11, 0x01,
+    SEQ_CMD, 0xe3, 2, 0x10, 0x88,
+    SEQ_CMD, 0xe4, 2, 0x10, 0x88,
+    SEQ_CMD, 0xe5, 2, 0x00, 0x88,
+    SEQ_CMD, 0xe7, 13, 0x33, 0x0d, 0x57, 0x0e, 0x57, 0x05, 0x57, 0x02, 0x04, 0x10, 0x0b, 0x02, 0x02,
+    SEQ_CMD, 0xe8, 5, 0x30, 0x0d, 0x84, 0x8c, 0x21,
+    SEQ_CMD, 0xe9, 5, 0x4b, 0x1a, 0xba, 0x60, 0x11,
+    SEQ_CMD, 0xea, 5, 0x4b, 0xba, 0xba, 0x10, 0x11,
+    SEQ_CMD, 0xeb, 5, 0x0b, 0x3a, 0xd9, 0x10, 0x11,
+    SEQ_CMD, 0xef, 3, 0x00, 0x00, 0x00,
+    SEQ_CMD, 0xf0, 18, 0x12, 0x01, 0x21, 0xa5, 0x6c, 0x23, 0x02, 0x01, 0x08, 0x0d, 0x1e, 0xde, 0x5a, 0x93, 0xdc, 0x0d, 0x1e, 0x17,
+    SEQ_CMD, 0xf1, 18, 0x12, 0x05, 0x21, 0xb5, 0x8d, 0x24, 0x02, 0x01, 0x08, 0x0d, 0x1a, 0xde, 0x4a, 0x72, 0xdb, 0x0d, 0x1e, 0x17,
+    SEQ_CMD, 0xf2, 18, 0x0e, 0x00, 0x30, 0xd6, 0x8f, 0x34, 0x03, 0x07, 0x08, 0x11, 0x1f, 0xcf, 0x29, 0x70, 0xcb, 0x0c, 0x18, 0x17,
+    SEQ_CMD, 0xfa, 3, 0x02, 0x00, 0x02,
+    SEQ_CMD, 0xf7, 2, 0x00, 0xc0,
+    SEQ_CMD, 0x35, 1, 0x00,
+    SEQ_CLEAR,
+    SEQ_CMD, 0x29, 0,
+    SEQ_SLEEP, 1,
+    SEQ_CMD, 0x11, 0,
+    SEQ_SLEEP, 120,
+    SEQ_CMD, 0x29, 0,
+    SEQ_SLEEP, 1,
+    SEQ_END
+};
+
+static const uint8_t* const lcd_init_seqs[] INITCONST_ATTR =
+{
+    lcd_init_seq_0, lcd_init_seq_1, lcd_init_seq_2, lcd_init_seq_3, lcd_init_seq_4
+};
+
+/* display off + sleep in, per type (iPod OS panel tables) */
+static const uint8_t lcd_sleep_seq_03[] =
+{
+    SEQ_CLEAR,
+    SEQ_CMD, 0x28, 0,
+    SEQ_CMD, 0x10, 0,
+    SEQ_SLEEP, 50,
+    SEQ_END
+};
+
+static const uint8_t lcd_sleep_seq_1[] =
+{
+    SEQ_CLEAR,
+    SEQ_CMD, 0x28, 0,
+    SEQ_CMD, 0x10, 0,
+    SEQ_SLEEP, 50,
+    SEQ_END
+};
+
+static const uint8_t lcd_sleep_seq_2[] =
+{
+    SEQ_CLEAR,
+    SEQ_CMD, 0x28, 0,
+    SEQ_CMD, 0x10, 0,
+    SEQ_END
+};
+
+static const uint8_t lcd_sleep_seq_4[] =
+{
+    SEQ_CLEAR,
+    SEQ_CMD, 0x28, 0,
+    SEQ_CMD, 0x10, 0,
+    SEQ_END
+};
+
+static const uint8_t* const lcd_sleep_seqs[] =
+{
+    lcd_sleep_seq_03, lcd_sleep_seq_1, lcd_sleep_seq_2, lcd_sleep_seq_03, lcd_sleep_seq_4
+};
+
+static int lcd_type IDATA_ATTR = LCD_TYPE_UNKNOWN;
+static uint8_t lcd_madctl IDATA_ATTR = 0x60;  /* 0x36 parameter per window: 0x20 on 58xx, 0x60 on the others */
+uint8_t lcd_id[4];
+
+static void lcd_set_mode(uint32_t mode) ICODE_ATTR __attribute__((noinline));
+static void lcd_set_mode(uint32_t mode)
+{
+    while (!(LCDSTATUS & 0x2));
+    udelay(1);
+    LCDCON = mode;
+}
+
 static void lcd_send_cmd(uint16_t cmd) ICODE_ATTR __attribute__((noinline));
 static void lcd_send_cmd(uint16_t cmd)
 {
@@ -72,17 +330,102 @@ static void lcd_send_data(uint16_t data) ICODE_ATTR __attribute__((noinline));
 static void lcd_send_data(uint16_t data)
 {
     while (LCDSTATUS & 0x10);
-    LCDWDATA = (data & 0xff) | ((data & 0x7f00) << 1);
+    LCDWDATA = data;
 }
 
-static uint32_t lcd_detect() ICODE_ATTR;
-static uint32_t lcd_detect()
+/* the whole GRAM to 0xffff, polled (the panel tables clear it before display on and before display off) */
+static void lcd_clear_gram(void)
 {
-    return (PDAT6 & 0x30) >> 4;
+    int n;
+    lcd_set_mode(LCD_MODE_CMD);
+    lcd_send_cmd(0x2a);
+    lcd_send_data(0);
+    lcd_send_data(0);
+    lcd_send_data((LCD_WIDTH - 1) >> 8);
+    lcd_send_data((LCD_WIDTH - 1) & 0xff);
+    lcd_send_cmd(0x2b);
+    lcd_send_data(0);
+    lcd_send_data(0);
+    lcd_send_data((LCD_HEIGHT - 1) >> 8);
+    lcd_send_data((LCD_HEIGHT - 1) & 0xff);
+    lcd_send_cmd(0x2c);
+    lcd_set_mode(LCD_MODE_FRAME);
+    for (n = 0; n < LCD_WIDTH * LCD_HEIGHT; n++)
+    {
+        while (LCDSTATUS & 0x10);
+        LCDWDATA = 0xffff;
+    }
+    lcd_set_mode(LCD_MODE_CMD);
+}
+
+static void lcd_run_seq(const uint8_t* seq)
+{
+    while (1)
+        switch (*seq++)
+        {
+        case SEQ_CMD:
+        {
+            int len;
+            lcd_send_cmd(*seq++);
+            len = *seq++;
+            while (len--) lcd_send_data(*seq++);
+            break;
+        }
+        case SEQ_SLEEP:
+        {
+            /* udelay() evaluates its argument on every poll: read the step first */
+            long us = *seq++ * 1000;
+            udelay(us);             /* also runs before the scheduler, so no sleep() */
+            break;
+        }
+        case SEQ_CLEAR:
+            lcd_clear_gram();
+            break;
+        default:
+            return;
+        }
+}
+
+static void lcd_read_id(uint8_t* id)
+{
+    int i;
+    lcd_set_mode(LCD_MODE_CMD);
+    lcd_send_cmd(0x04);
+    for (i = 0; i < 4; i++)
+    {
+        long timestamp;
+        while (!(LCDSTATUS & 0x2));
+        LCDRDATA = 0;
+        timestamp = USEC_TIMER;
+        while (!(LCDSTATUS & 0x1))
+            if (TIMEOUT_EXPIRED(timestamp, 10000)) break;
+        id[i] = LCDDBUFF >> 1;
+    }
+}
+
+static int lcd_detect()
+{
+    int retry;
+    for (retry = 0; retry < 6; retry++)
+    {
+        if (retry) udelay(10000);
+        lcd_read_id(lcd_id);
+        if (lcd_id[1] == 0x58) return LCD_TYPE_58XX;
+        if (lcd_id[1] == 0x38)
+            switch (lcd_id[2])
+            {
+            case 0xb3: return LCD_TYPE_38B3;
+            case 0xc4: return LCD_TYPE_38C4;
+            case 0xd5: return LCD_TYPE_38D5;
+            case 0xe6: return LCD_TYPE_38E6;
+            }
+    }
+    return LCD_TYPE_UNKNOWN;
 }
 
 void lcd_init()
 {
+    int i;
     mutex_init(&lcd_mutex);
     wakeup_init(&lcd_wakeup);
     lcd_dma_busy = true;
@@ -92,23 +435,25 @@ void lcd_init()
         lcd_dma_busy = false;
         clockgate_dma(0, 4, false);
     }
-    switch (lcd_detect())
-    {
-//    case 0:
-//        pmu_write(0x31, 0x0b);  // Vlcd @ 2.000V
-//        break;
-    case 1:
-//        pmu_write(0x31, 0x0e);  // Vlcd @ 2.300V
-        break;
-    case 2:
-//        pmu_write(0x31, 0x12);  // Vlcd @ 2.700V
-        break;
-//    case 3:
-//        pmu_write(0x31, 0x0b);  // Vlcd @ 2.000V
-//        break;
-//    default:
-//        pmu_write(0x31, 0x0b);  // Vlcd @ 2.000V
-    }
+    clockgate_enable(CLOCKGATE_LCD, true);         /* the only LCD gate on the S5L8702 (gate 1) */
+    DMAC0CONFIG = 1;                                /* PL080 master enable (DMAC0 is otherwise only as a loader left it) */
+    /* panel reset as Apple's DFU loader does before the init table (wtf mem:0x220049a8): GPIO 0x36 (port 6 bit 6,
+       PCON nibble 0xf = output high from stage 1) low 10 ms, high 20 ms */
+    PDAT(6) &= ~0x40;
+    udelay(10000);
+    PDAT(6) |= 0x40;
+    udelay(20000);
+    lcd_set_mode(LCD_MODE_FRAME);   /* controller setup as the iPod OS does it */
+    LCDREG(0x88) = 0x01000000;
+    LCDPHTIME = 0x33;
+    LCDREG(0x7c) = 0x402;
+    lcd_set_mode(LCD_MODE_CMD);
+    for (i = 0; i < 4; i++) lcd_send_data(0);     /* the loader's four dummy writes after the reset */
+    lcd_type = lcd_detect();
+    lcd_madctl = lcd_type == LCD_TYPE_58XX ? 0x20 : 0x60;
+    lcd_set_mode(LCD_MODE_CMD);
+    /* unknown panel: nothing is sent, the frame writes still go out */
+    if (lcd_type != LCD_TYPE_UNKNOWN) lcd_run_seq(lcd_init_seqs[lcd_type]);
 }
 
 bool displaylcd_busy() ICODE_ATTR;
@@ -136,38 +481,21 @@ void displaylcd_setup(unsigned int startx, unsigned int endx,
         displaylcd_sync();
     }
     else while (DMAC0C4CONFIG & 1);
-    while (!(LCDSTATUS & 0x2));
-    LCDCON = 0x80100db0;
-    if (lcd_detect() & 2)
-    {
-        lcd_send_cmd(0x210);
-        lcd_send_data(startx);
-        lcd_send_cmd(0x211);
-        lcd_send_data(endx);
-        lcd_send_cmd(0x212);
-        lcd_send_data(starty);
-        lcd_send_cmd(0x213);
-        lcd_send_data(endy);
-        lcd_send_cmd(0x200);
-        lcd_send_data(startx);
-        lcd_send_cmd(0x201);
-        lcd_send_data(starty);
-        lcd_send_cmd(0x202);
-    }
-    else
-    {
-        lcd_send_cmd(0x2a);
-        lcd_send_data(startx >> 8);
-        lcd_send_data(startx & 0xff);
-        lcd_send_data(endx >> 8);
-        lcd_send_data(endx & 0xff);
-        lcd_send_cmd(0x2b);
-        lcd_send_data(starty >> 8);
-        lcd_send_data(starty & 0xff);
-        lcd_send_data(endy >> 8);
-        lcd_send_data(endy & 0xff);
-        lcd_send_cmd(0x2c);
-    }
+    lcd_set_mode(LCD_MODE_CMD);
+    lcd_send_cmd(0x36);
+    lcd_send_data(lcd_madctl);
+    lcd_send_cmd(0x2a);
+    lcd_send_data(startx >> 8);
+    lcd_send_data(startx & 0xff);
+    lcd_send_data(endx >> 8);
+    lcd_send_data(endx & 0xff);
+    lcd_send_cmd(0x2b);
+    lcd_send_data(starty >> 8);
+    lcd_send_data(starty & 0xff);
+    lcd_send_data(endy >> 8);
+    lcd_send_data(endy & 0xff);
+    lcd_send_cmd(0x2c);
+    lcd_set_mode(LCD_MODE_FRAME);
 }
 
 static void displaylcd_dma(void* data, int pixels, bool solid) ICODE_ATTR;
@@ -366,47 +694,8 @@ void lcd_shutdown()
 {
     mutex_lock(&lcd_mutex, TIMEOUT_BLOCK);
     displaylcd_sync();
-    while (!(LCDSTATUS & 0x2));
-    LCDCON = 0x80100db0;
-    uint32_t type = lcd_detect();
-    if (type & 2)
-    {
-        lcd_send_cmd(0x7);
-        lcd_send_data(0x172);
-        lcd_send_cmd(0x30);
-        lcd_send_data(0x3ff);
-        sleep(90000);
-        lcd_send_cmd(0x7);
-        lcd_send_data(0x120);
-        lcd_send_cmd(0x30);
-        lcd_send_data(0x0);
-        lcd_send_cmd(0x100);
-        lcd_send_data(0x780);
-        lcd_send_cmd(0x7);
-        lcd_send_data(0x0);
-        lcd_send_cmd(0x101);
-        lcd_send_data(0x260);
-        lcd_send_cmd(0x102);
-        lcd_send_data(0xa9);
-        sleep(30000);
-        lcd_send_cmd(0x100);
-        lcd_send_data(0x700);
-        lcd_send_cmd(0x100);
-        lcd_send_data(0x704);
-    }
-    else if (type == 1)
-    {
-        lcd_send_cmd(0x28);
-        lcd_send_cmd(0x10);
-        sleep(100000);
-    }
-    else
-    {
-        lcd_send_cmd(0x28);
-        sleep(50000);
-        lcd_send_cmd(0x10);
-        sleep(50000);
-    }
+    lcd_set_mode(LCD_MODE_CMD);
+    if (lcd_type != LCD_TYPE_UNKNOWN) lcd_run_seq(lcd_sleep_seqs[lcd_type]);
 }
 
 void INT_DMAC0C4()
