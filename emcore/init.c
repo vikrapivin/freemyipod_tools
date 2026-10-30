@@ -202,6 +202,9 @@ void initthread(void* arg0, void* arg1, void* arg2, void* arg3)
 #ifdef HAVE_NAND5G
     { extern int n5g_nand_init(void); n5g_nand_init(); }
 #endif
+#ifdef HAVE_NAND3G
+    { extern int n3g_nand_init(void); n3g_nand_init(); }
+#endif
 #ifdef HAVE_BUTTON
     button_init();
 #endif

@@ -55,6 +55,11 @@ target/ipodnano3g/clickwheel.c
 target/ipodnano3g/spi.c
 target/ipodnano3g/targetinit.c
 target/ipodnano3g/uart.c
+#ifdef HAVE_NAND3G
+target/ipodnano3g/nand3g.c
+target/ipodnano3g/nand/nand-backend.c
+target/ipodnano3g/nand/nand-swnand.c
+#endif
 target/ipodnano2g/rtc.c
 usb/synopsysotg.c
 usb/synopsysotg_s5l87xx.c

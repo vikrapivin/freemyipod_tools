@@ -98,5 +98,10 @@
 
 #define HAVE_TARGETINIT_LATE
 
+#ifndef N3G_NAND_DISABLE
+#define HAVE_NAND3G
+#endif
+/* no HAVE_STORAGE: the NAND harness (nand3g.c, Rockbox driver copy under nand/) is reached over USB only */
+
 
 #endif

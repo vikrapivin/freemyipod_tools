@@ -785,6 +785,8 @@ struct dma_lli
 
 
 /////CLOCK GATES/////
+#define CLOCKGATE_NAND 8
+#define CLOCKGATE_NANDECC 12
 #define CLOCKGATE_LCD 1
 #define CLOCKGATE_USB_1 2
 #define CLOCKGATE_DMA(x) ((x) ? 26 : 25)
@@ -796,6 +798,65 @@ struct dma_lli
 #define CLOCKGATE_SPI_0 34
 #define CLOCKGATE_SPI_1 43
 #define CLOCKGATE_SPI_2 47
+
+
+/////NAND FLASH CONTROLLER (first FMC) -- adapted from Rockbox firmware/export/s5l87xx.h/////
+#define FMC_BASE 0x38a00000
+#define FMCTRL0   (*((uint32_t volatile*)(FMC_BASE + 0x0000)))
+#define FMCTRL1   (*((uint32_t volatile*)(FMC_BASE + 0x0004)))
+#define FMCMD     (*((uint32_t volatile*)(FMC_BASE + 0x0008)))
+#define FMADDR0   (*((uint32_t volatile*)(FMC_BASE + 0x000c)))
+#define FMADDR1   (*((uint32_t volatile*)(FMC_BASE + 0x0010)))
+#define FMADDR2   (*((uint32_t volatile*)(FMC_BASE + 0x0014)))
+#define FMADDR3   (*((uint32_t volatile*)(FMC_BASE + 0x0018)))
+#define FMADDR4   (*((uint32_t volatile*)(FMC_BASE + 0x001c)))
+#define FMADDR5   (*((uint32_t volatile*)(FMC_BASE + 0x0020)))
+#define FMADDR6   (*((uint32_t volatile*)(FMC_BASE + 0x0024)))
+#define FMADDR7   (*((uint32_t volatile*)(FMC_BASE + 0x0028)))
+#define FMANUM    (*((uint32_t volatile*)(FMC_BASE + 0x002c)))
+#define FMDNUM    (*((uint32_t volatile*)(FMC_BASE + 0x0030)))
+#define FMDATAW0  (*((uint32_t volatile*)(FMC_BASE + 0x0034)))
+#define FMDATAW1  (*((uint32_t volatile*)(FMC_BASE + 0x0038)))
+#define FMDATAW2  (*((uint32_t volatile*)(FMC_BASE + 0x003c)))
+#define FMDATAW3  (*((uint32_t volatile*)(FMC_BASE + 0x0040)))
+#define FMCSTAT   (*((uint32_t volatile*)(FMC_BASE + 0x0048)))
+#define FMSYND0   (*((uint32_t volatile*)(FMC_BASE + 0x004c)))
+#define FMSYND1   (*((uint32_t volatile*)(FMC_BASE + 0x0050)))
+#define FMSYND2   (*((uint32_t volatile*)(FMC_BASE + 0x0054)))
+#define FMSYND3   (*((uint32_t volatile*)(FMC_BASE + 0x0058)))
+#define FMSYND4   (*((uint32_t volatile*)(FMC_BASE + 0x005c)))
+#define FMSYND5   (*((uint32_t volatile*)(FMC_BASE + 0x0060)))
+#define FMSYND6   (*((uint32_t volatile*)(FMC_BASE + 0x0064)))
+#define FMSYND7   (*((uint32_t volatile*)(FMC_BASE + 0x0068)))
+#define FMUNK78   (*((uint32_t volatile*)(FMC_BASE + 0x0078)))
+#define FMUNK7C   (*((uint32_t volatile*)(FMC_BASE + 0x007c)))
+#define FMFIFO    (*((uint32_t volatile*)(FMC_BASE + 0x0080)))
+#define FMTRANS0  (*((uint32_t volatile*)(FMC_BASE + 0x080c)))
+#define FMUNK810  (*((uint32_t volatile*)(FMC_BASE + 0x0810)))
+#define FMTRANS1  (*((uint32_t volatile*)(FMC_BASE + 0x0814)))
+#define FMTRANSSTAT (*((uint32_t volatile*)(FMC_BASE + 0x0840)))
+
+#define FMCTRL0_CE(bank)       (1 << ((bank) + 1))
+#define FMCTRL0_CE_MASK        (0xff << 1)
+#define FMCTRL0_ENABLEDMA      (1 << 10)
+#define FMCTRL0_UNK1           (1 << 11)
+#define FMCTRL0_AUTOXFER       (1 << 24)
+#define FMCTRL1_DOTRANSADDR    (1 << 0)
+#define FMCTRL1_DOREADDATA     (1 << 1)
+#define FMCTRL1_DOWRITEDATA    (1 << 2)
+#define FMCTRL1_CLEARWFIFO     (1 << 6)
+#define FMCTRL1_CLEARRFIFO     (1 << 7)
+#define FMCSTAT_RBBDONE        (1 << 0)
+#define FMCSTAT_CMDDONE        (1 << 1)
+#define FMCSTAT_ADDRDONE       (1 << 2)
+#define FMCSTAT_TRANSDONE      (1 << 3)
+#define FMCSTAT_BANK0READY     (1 << 4)
+#define FMCSTAT_BANK1READY     (1 << 5)
+#define FMCSTAT_BANK2READY     (1 << 6)
+#define FMCSTAT_BANK3READY     (1 << 7)
+#define FMCSTAT_UNK20          (1 << 20)
+#define FMCSTAT_STATUSREADY    (1 << 23)
+#define FMCSTAT_UNK27          (1 << 27)
 
 
 /////INTERRUPTS/////

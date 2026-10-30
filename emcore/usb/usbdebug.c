@@ -27,6 +27,9 @@
 #include "target/ipodnano5g/nand5g.h"
 #include "target/ipodnano5g/module5g.h"
 #endif
+#ifdef HAVE_NAND3G
+#include "target/ipodnano3g/nand3g.h"
+#endif
 #include "usbdebug.h"
 #include "panic.h"
 #include "usb.h"
@@ -309,6 +312,13 @@ bool usbdebug_handle_data(const struct usb_instance* data, union usb_endpoint_nu
         case N5G_NAND_FLUSH:
         case N5G_NAND_WRITE_CAPS:
             n5g_nand_usb_command(buf, dbgbuf);
+            break;
+#endif
+#ifdef HAVE_NAND3G
+        case N3G_NAND_STATUS:
+        case N3G_NAND_STEP:
+        case N3G_NAND_READ_PAGE:
+            n3g_nand_usb_command(buf, dbgbuf);
             break;
 #endif
         case 10:  // READ CONSOLE
@@ -929,6 +939,13 @@ void dbgthread(void* arg0, void* arg1, void* arg2, void* arg3)
                     buf[2] = 0;
                     buf[3] = 0;
 #endif
+                    break;
+#endif
+#ifdef HAVE_NAND3G
+                case N3G_NAND_HEARTBEAT:
+                    buf[0] = 1;
+                    buf[1] = 0;
+                    n3g_nand_heartbeat(&buf[2], &buf[3]);
                     break;
 #endif
                 default:
