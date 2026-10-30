@@ -252,7 +252,10 @@ struct usb_instance usb_default_data =
 struct usb_instance* usb_data = &usb_default_data;
 
 static struct scheduler_thread usbmanager_thread_handle;
-static uint32_t usbmanager_stack[0x40] STACK_ATTR;
+#ifndef USBMANAGER_STACK_WORDS
+#define USBMANAGER_STACK_WORDS 0x40
+#endif
+static uint32_t usbmanager_stack[USBMANAGER_STACK_WORDS] STACK_ATTR;
 static bool usb_connected;
 static struct mutex usbmanager_mutex;
 

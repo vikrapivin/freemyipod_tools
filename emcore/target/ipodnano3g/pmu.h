@@ -41,7 +41,7 @@ void pmu_ldo_power_on(unsigned int ldo);
 void pmu_ldo_power_off(unsigned int ldo);
 void pmu_set_wake_condition(unsigned char condition);
 void pmu_enter_standby(void);
-void pmu_read_rtc(unsigned char* buffer);
+void pmu_read_rtc(unsigned char* buffer);       /* 6 bytes: sec min hour day month year (D1671) */
 void pmu_write_rtc(unsigned char* buffer);
 
 
