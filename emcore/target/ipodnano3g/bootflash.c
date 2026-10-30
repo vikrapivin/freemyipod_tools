@@ -29,20 +29,14 @@
 #include "s5l8702.h"
 
 
+/* chip select through the GPIO command register, as Apple's restore OS drives it (aupd mem:0x080cd588,
+   mem:0x080cd53c, mem:0x08017cd0): (port << 16) | (pin << 8) | 0xe/0xf = output low (selected) / high */
 void bootflash_ce(int port, bool state)
 {
-    if (state)
-    {
-        if (port == 2) PDAT(0xe) &= ~0x40;
-        else if (port == 1) PDAT(6) &= ~0x10;
-        else PDAT(0) &= ~1;
-    }
-    else
-    {
-        if (port == 2) PDAT(0xe) |= 0x40;
-        else if (port == 1) PDAT(6) |= 0x10;
-        else PDAT(0) |= 1;
-    }
+    uint32_t level = state ? 0 : 1;
+    if (port == 2) GPIOCMD = 0xe060e | level;
+    else if (port == 1) GPIOCMD = 0x6040e | level;
+    else GPIOCMD = 0x0000e | level;
 }
 
 void bootflash_wait_ready(int port)
