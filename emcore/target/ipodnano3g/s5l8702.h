@@ -787,7 +787,7 @@ struct dma_lli
 #define CLOCKGATE_DMA(x) ((x) ? 26 : 25)
 #define CLOCKGATE_DMA_0 25
 #define CLOCKGATE_USB_2 35
-#define CLOCKGATE_I2C(x) 36
+#define CLOCKGATE_I2C(x) ((x) == 1 ? 38 : 36)   /* I2C0 36, I2C1 38 (Rockbox s5l87xx.h) */
 #define CLOCKGATE_I2C_0 36
 #define CLOCKGATE_SPI(x) ((i) == 2 ? 47 : (i) == 1 ? 43 : 34)
 #define CLOCKGATE_SPI_0 34
