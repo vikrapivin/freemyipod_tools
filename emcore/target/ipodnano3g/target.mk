@@ -1,4 +1,7 @@
 CFLAGS_ipodnano3g += -mcpu=arm926ej-s
+ifeq ($(N3G_USB_PHY_APPLE),1)
+CFLAGS_ipodnano3g += -DN3G_USB_PHY_APPLE
+endif
 # No UCL image: like the nano 5G, the kernel is packaged with a stage-1 SRAM loader (stage1.S) in an
 # IMG1 "8702" container built by tools/nano3g/image.py.
 TARGET_OUTPUT_ipodnano3g := build/ipodnano3g/emcore-nano3g.dfu build/ipodnano3g/emcore-nano3g.bin build/ipodnano3g/emcore-nano3g.nm
