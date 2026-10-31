@@ -118,6 +118,32 @@ void INT_USB_FUNC()
 
 static const struct usb_instance* synopsysotg_instance;
 
+#if defined(TARGET_ipodnano3g) && defined(N3G_USB_PHY_APPLE)
+/* nano 3G, build option N3G_USB_PHY_APPLE: the restore OS's PHY power-on (aupd mem:0x08121c54 with mem:0x08100a24,
+   mem:0x080fde50, mem:0x08121bd4, mem:0x08101724) instead of the sequence below, which is the one the device has
+   been verified with. Device test before making it the default: enumeration and a 1 MB bulk transfer. */
+#define PHY(o) (*(volatile uint32_t*)(PHYBASE + (o)))
+void synopsysotg_target_enable_clocks(const struct usb_instance* instance)
+{
+    const struct synopsysotg_config* data = (const struct synopsysotg_config*)instance->driver_config;
+    clockgate_enable(CLOCKGATE_USB_1, true);
+    clockgate_enable(CLOCKGATE_USB_2, true);
+    data->core->pcgcctl.d32 = 0;
+    udelay(800);
+    PHY(0x00) = 0;
+    PHY(0x04) = SYNOPSYSOTG_CLOCK;
+    udelay(10);
+    PHY(0x18) = 0x400;
+    PHY(0x08) = 7;
+    udelay(10);
+    PHY(0x40) = (PHY(0x40) & ~0x7ffu) | 0x347;
+    PHY(0x44) = (PHY(0x44) & ~0xfffu) | 0xfff;
+    PHY(0x100) |= 1;
+    udelay(10);
+    PHY(0x08) = 0;
+    udelay(815);
+}
+#else
 void synopsysotg_target_enable_clocks(const struct usb_instance* instance)
 {
     const struct synopsysotg_config* data = (const struct synopsysotg_config*)instance->driver_config;
@@ -136,6 +162,8 @@ void synopsysotg_target_enable_clocks(const struct usb_instance* instance)
     *((volatile uint32_t*)(PHYBASE + 0x04)) = SYNOPSYSOTG_CLOCK;
     udelay(400);
 }
+
+#endif
 
 void synopsysotg_target_disable_clocks(const struct usb_instance* instance)
 {
@@ -173,5 +201,9 @@ void INT_USB_FUNC()
 void synopsysotg_target_run_mode(const struct usb_instance* instance)
 {
     (void)instance;
+#if defined(TARGET_ipodnano3g) && defined(N3G_USB_PHY_APPLE)
+    PHY(0x30) &= ~4u;           /* run mode, aupd mem:0x08121bd4(1) */
+    PHY(0x18) = 0;
+#endif
 }
 #endif

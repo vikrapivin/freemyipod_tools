@@ -39,25 +39,29 @@ void timer_init()
 
 void timer_schedule_wakeup(uint32_t usecs)
 {
-    if (usecs > 28256363)
+    /* Timer B on ECLK (12 MHz) / 16 = 750 kHz, as the iPod OS clocks its timers (osos mem:0x0836d36c: TxCON 0x240,
+       bit 6 = ECLK); the classic's PCLK/64 constants assumed a 76 MHz PCLK, the nano 3G's is 54 MHz */
+    if (usecs > 44739242)               /* 65535 ticks at 750000/512 Hz */
     {
         TBPRE = 511;
         TBDATA1 = 65535;
     }
-    else if (usecs > 55188)
+    else if (usecs > 87380)             /* 65535 ticks at 750 kHz */
     {
         TBPRE = 511;
-        TBDATA1 = (usecs * 152) >> 16;
+        TBDATA1 = (usecs * 3) >> 11;    /* 750000 / 512 Hz = 3 / 2048 per us */
     }
     else
     {
         TBPRE = 0;
-        TBDATA1 = (usecs * 152) >> 7;
+        TBDATA1 = (usecs * 3) >> 2;     /* 0.75 per us */
     }
+    if (!TBDATA1) TBDATA1 = 1;
     TBCON = (1 << 13) | /* TB_INT1_EN */
             (0 << 12) | /* TB_INT0_EN */
             (0 << 11) | /* TB_START */
-            (3 << 8) |  /* TB_CS = PCLK / 64 */
+            (2 << 8) |  /* TB_CS = ECLK / 16 */
+            (1 << 6) |  /* clock source ECLK */
             (2 << 4);   /* TB_MODE_SEL = one-shot mode */
     TBCMD = (1 << 1);   /* TB_CLR */
     TBCMD = (1 << 0);   /* TB_EN */

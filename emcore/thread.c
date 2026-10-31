@@ -354,7 +354,9 @@ void scheduler_switch(struct scheduler_thread* thread, struct scheduler_thread* 
         }
 
         if (thread == &idle_thread) timer_schedule_wakeup(next_unblock);
-        else timer_schedule_wakeup(SYSTEM_TICK);
+        /* a thread is running: preempt it at the tick, or earlier when a sleeper is due (a sleep shorter than
+           the tick otherwise lasts until the next tick whenever another thread is busy) */
+        else timer_schedule_wakeup(next_unblock < 10 ? 10 : next_unblock < SYSTEM_TICK ? next_unblock : SYSTEM_TICK);
     }
 
     current_thread = thread;

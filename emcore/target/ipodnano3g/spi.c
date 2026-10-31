@@ -27,6 +27,7 @@
 #include "thread.h"
 #include "clockgates.h"
 #include "clockgates-target.h"
+#include "mmu.h"
 
 
 static struct mutex spimutex[3];
@@ -61,44 +62,19 @@ uint32_t spi_write(int port, uint32_t data)
     return SPIRXDATA(port);
 }
 
+/* programmed I/O for every size, as Apple's restore OS reads the boot flash (aupd mem:0x08018c14, mem:0x080d8f04);
+   the classic's DMA path for >= 0x100 bytes depended on an unverified DMA channel/interrupt setup */
 void spi_read(int port, uint32_t size, void* buf)
 {
     uint8_t* buffer = (uint8_t*)buf;
     SPIRXLIMIT(port) = size;
-    if (size < 0x100)
+    SPISETUP(port) |= 1;
+    while (size--)
     {
-        SPISETUP(port) |= 1;
-        while (size--)
-        {
-            while (!(SPISTATUS(port) & 0x3e00)) yield();
-            *buffer++ = SPIRXDATA(port);
-        }
-        SPISETUP(port) &= ~1;
-        return;
+        while (!(SPISTATUS(port) & 0x3e00)) yield();
+        *buffer++ = SPIRXDATA(port);
     }
-    SPISETUP(port) |= 0x41;
-    void* addr = (void*)((uint32_t)buf + size);
-    struct dma_lli* lli = (struct dma_lli*)(((uint32_t)addr - 0x10) & ~0xf);
-    struct dma_lli* nextlli = NULL;
-    clockgate_dma(0, port + 5, true);
-    while (addr > buf)
-    {
-        size = (uint32_t)addr - (uint32_t)buf;
-        if (size > 0xfff) size = 0xfff;
-        else lli = (struct dma_lli*)((int)&DMAC0CLLI(port + 5));
-        addr = (void*)((uint32_t)addr - size);
-        lli->srcaddr = (void*)((int)&SPIRXDATA(port));
-        lli->dstaddr = addr;
-        lli->nextlli = nextlli;
-        lli->control = 0x78000000 | size | (nextlli == NULL ? 0x80000000 : 0);
-        nextlli = lli;
-        lli = &lli[-1];
-    }
-    invalidate_dcache();
-    DMAC0CCONFIG(port + 5) = 0x9001 | (SPIDMA(port) << 1);
-    wakeup_wait(&spiwakeup[port], TIMEOUT_BLOCK);
-    clockgate_dma(0, port + 5, false);
-    SPISETUP(port) &= ~0x41;
+    SPISETUP(port) &= ~1;
 }
 
 void INT_DMAC0C5()

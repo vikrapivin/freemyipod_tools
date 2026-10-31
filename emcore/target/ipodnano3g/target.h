@@ -30,8 +30,10 @@
 
 #define ARM_ARCH 5
 #define LITTLE_ENDIAN
-#define CACHEALIGN_BITS 4
-#define CPU_FREQ 191692800
+#define CACHEALIGN_BITS 5   /* ARM926EJ-S: 32-byte D-cache lines (osos mem:0x08025754 clean loop step 0x20) */
+/* The USB manager's VBUS poll goes through the PMU over I2C (power.c), not a GPIO read: 256 B left 8 B spare */
+#define USBMANAGER_STACK_WORDS 0x100
+#define CPU_FREQ 216000000   /* stage1: PLL2 216 MHz, CClk = FClk */
 
 
 #define CONSOLE_BOOT 3
@@ -95,6 +97,11 @@
 //#define SECTOR_SIZE 4096
 
 #define HAVE_TARGETINIT_LATE
+
+#ifndef N3G_NAND_DISABLE
+#define HAVE_NAND3G
+#endif
+/* no HAVE_STORAGE: the NAND harness (nand3g.c, Rockbox driver copy under nand/) is reached over USB only */
 
 
 #endif

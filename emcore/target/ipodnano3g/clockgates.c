@@ -23,6 +23,8 @@
 
 #include "global.h"
 #include "s5l8702.h"
+#include "contextswitch.h"
+#include "clockgates.h"
 
 
 uint32_t clockgates_dma[2];

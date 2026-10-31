@@ -27,7 +27,9 @@
 #include "thread.h"
 #include "timer.h"
 #include "s5l8702.h"
+#include "clockgates.h"
 #include "contextswitch.h"
+#include "interrupt.h"
 #ifdef TARGET_ipodclassic
 #include "fat.h"
 #include "storage_ata.h"
@@ -154,6 +156,31 @@ void clickwheel_thread(void* arg0, void* arg1, void* arg2, void* arg3)
 }
 
 
+/* start the wheel controller and send the init request (0x8000023a, answered with the same word). apple = true:
+   osos mem:0x0806c900 (setup) and mem:0x0836d264 (send): WHEEL08 = 0x3a980, WHEEL00 = 0x300000 then bit 21 toggled,
+   the request shifted right by one with bit 31 set, busy = WHEEL0C bit 3. false: WHEEL08 = 0x20000, WHEEL00 =
+   0x380000, the request as is, busy = WHEEL0C bit 2. Every wait is bounded. */
+static void wheel_start(bool apple)
+{
+    long t0;
+    uint32_t busy = apple ? 8 : 4;
+    WHEEL00 = 0;
+    WHEELINT = 7;
+    WHEEL10 |= 1;
+    WHEEL08 = apple ? 0x3a980 : 0x20000;
+    WHEEL00 = apple ? 0x300000 : 0x380000;
+    if (apple)
+    {
+        WHEEL00 &= ~0x200000;
+        udelay(1);
+        WHEEL00 |= 0x200000;
+    }
+    t0 = USEC_TIMER;
+    while ((WHEEL0C & busy) && !TIMEOUT_EXPIRED(t0, 20000)) yield();
+    WHEELTX = apple ? ((0x8000023A >> 1) | 0x80000000) : 0x8000023A;
+    WHEEL04 |= 1;
+}
+
 int clickwheel_init()
 {
     wakeup_init(&clickwheel_wakeup);
@@ -164,20 +191,21 @@ int clickwheel_init()
     lastpacket = 0;
     collect = 0;
     lastdiff = 0;
-    PCON(14) = (PCON(14) & ~0xffff0000) | 0x22220000;
-    PUNA(2) &= ~2;
-    WHEELINT = 7;
-    WHEEL10 = 1;
-    interrupt_enable(IRQ_WHEEL, true);
-    WHEEL08 = 0x20000;
-    WHEEL00 = 0x380000;
-    while (WHEEL0C & 4) yield();
-    WHEELTX = 0x8000023A;
-    WHEEL04 |= 1;
+    /* nano 3G wheel pins: port 14 pins 2-5, function 2 (osos mem:0x0806c900 via mem:0x0836c690; Rockbox agrees);
+       the classic used pins 4-7 and a pull-up on port 2 */
+    clockgate_enable(33, true);     /* wheel controller gate (Rockbox CLOCKGATE_CWHEEL) */
+    PCON(14) = (PCON(14) & ~0x00ffff00) | 0x00222200;
     thread_create(&clickwheel_thread_handle, "Clickwheel dispatcher", clickwheel_thread,
                   clickwheel_stack, sizeof(clickwheel_stack), OS_THREAD, 200, true,
                   NULL, NULL, NULL, NULL);
+    interrupt_enable(IRQ_WHEEL, true);
+    wheel_start(true);              /* the iPod OS's controller setup */
     wakeup_wait(&clickwheel_init_wakeup, 100000);
+    if (!wheel_initialized)
+    {
+        wheel_start(false);         /* the values the classic / Rockbox's nano 3G port use */
+        wakeup_wait(&clickwheel_init_wakeup, 100000);
+    }
     if (!wheel_initialized) RET_ERR(0);
     return 0;
 }

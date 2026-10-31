@@ -133,7 +133,7 @@ void INT_TIMER(void) ICODE_ATTR;
 void INT_TIMER()
 {
     int i;
-    for (i = 0; i < ARRAYLEN(timervector); i++)
+    for (i = 0; i < 4; i++)     /* IRQ 8 serves timers A..D; E..H (0xa0..) are on IRQ 7 (osos mem:0x0836d36c) */
     {
         int tcon = TCON(i);
         if (tcon & (tcon >> 4) & 0x7000) timervector[i]();
