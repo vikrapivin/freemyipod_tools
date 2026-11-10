@@ -1,6 +1,13 @@
 #!/usr/bin/env python3
 """Nano4g image packaging, emCORE M2 experiments and NAND bring-up."""
 import sys
+from pathlib import Path
+
+# The script directory holds the nano4g and fmss packages. Isolated Python
+# does not put that directory on sys.path.
+_TOOLS = str(Path(__file__).resolve().parent)
+if _TOOLS not in sys.path:
+    sys.path.insert(0, _TOOLS)
 
 
 def main(argv=None):

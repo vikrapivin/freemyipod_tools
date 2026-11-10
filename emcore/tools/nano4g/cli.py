@@ -8,12 +8,28 @@ from pathlib import Path
 import sys
 import time
 
-from fmss import probe as P
-from fmss.target import NANO4G as T
-from .experiments import entries, resolve, SMOKE, campaign_order
 from .nand import make_dev_session, check, format_status
 from .protocol import Cmd, ToolError
 from .capture import compact, save, rebuild
+
+# Same five names as nano4g.experiments.SMOKE. Kept here so status, read-page
+# and cpu-suite do not import the FMSS experiment registry.
+SMOKE = ("state", "regmap", "alu", "pram", "memory")
+
+
+def load_campaign():
+    """Import the FMSS probe and the experiment registry. Used by fmss only."""
+    global P, T, entries, resolve, campaign_order
+    from fmss import probe as probe
+    from fmss.target import NANO4G as target
+    from .experiments import campaign_order as order
+    from .experiments import entries as all_entries
+    from .experiments import resolve as resolve_names
+    P = probe
+    T = target
+    entries = all_entries
+    resolve = resolve_names
+    campaign_order = order
 
 
 def parser():
@@ -295,6 +311,8 @@ def cpu_nand_command(s, a):
 
 def main(argv=None):
     a = parser().parse_args(argv)
+    if a.command == "fmss" and a.action != "rebuild":
+        load_campaign()
     if a.command == "fmss" and a.action == "explore" and a.list:
         for e in entries(include_followups=True):
             print("%-12s %-17s %s" % (e["name"], e["status"], e["reason"]))
