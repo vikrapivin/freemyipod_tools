@@ -2,7 +2,7 @@
 
 These are deliberately small, serialized experiments. Geometry describes the
 test workload, not M2 architectural limits. Native driver programs are local to
-target/ipodnano4g/nand/fmss/. 
+target/ipodnano4g/nand/fmss/.
 restore WRITE mem:0x080379e8, READ mem:0x08036688 (see source manifests).
 No M1 ECC_MODE, parity-slot layout, status event 5 or channel GPIO is reused.
 dma() keeps its historical FMC_DMA_CTRL=7 write (M1 R7 value) for comparability

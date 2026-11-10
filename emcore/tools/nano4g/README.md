@@ -212,8 +212,8 @@ With the nano 4G in the monitor and writes enabled, from `emCORE/`:
 python3 tools/n4g.py cpu-suite
 ```
 
-The command chooses one row on bank 1 when it runs, above 1024 and outside
-block 0. It reads that page with the FMSS reader and the CPU driver. It
+The command chooses one page on bank 1 when it runs. The page is greater
+than 1023. It reads that page with the FMSS reader and the CPU driver. It
 erases only after those reads match and every page of the block is in
 `nand_device_suite/` at the top of this tree. The command prints that path.
 The CPU writer programs one pattern; both readers have to return it. The

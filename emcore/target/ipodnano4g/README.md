@@ -23,7 +23,8 @@ python3 tools/n4g.py cpu-suite
 ```
 
 `cpu-suite --one-page` finds one logical page on bank 1 from the page spare
-(logical page 0 is skipped). The FMSS reader and the CPU driver both read
+(the logical page is greater than 1023). The FMSS
+reader and the CPU driver both read
 it, the CPU driver programs a pattern, and both readers must return that
 pattern. That block is erased for the program and then restored.
 `cpu-suite` without that flag saves the whole block, programs a pattern, and

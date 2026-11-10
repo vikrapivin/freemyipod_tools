@@ -1,5 +1,5 @@
 /* Physical NAND/M2 monitor inside emCORE (iPod nano 4G).
- * Status layout is fixed. legacy FTL/write commands are unsupported.
+ * Status layout is fixed. Legacy FTL/write commands are unsupported.
  *
  * A single NAND worker thread executes one job at a time; the USB sync commands 120..126 (usbdebug.c) only queue
  * a job and return. The host polls the status record (struct nand_poc_status, exported as `nand_poc_status`,

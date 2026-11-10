@@ -2,7 +2,7 @@
 
 One command, from emCORE/: ``python3 tools/n4g.py cpu-suite``.
 
-Bank 1. The row is chosen at run time, above 1024, and outside block 0.
+Bank 1. The page is chosen at run time and is greater than 1023.
 The FMSS reader is ``read-page`` (Rockbox read.s). The CPU path is
 ``cpu-nand`` with hardware ECC and BCH8. The two reads of the chosen page
 have to match before anything is erased. Erase clears the whole block, so
@@ -23,7 +23,7 @@ from pathlib import Path
 PAGE = 4096
 META = 10
 CHUNKS = 8
-ROW_MIN = 1025
+PAGE_MIN = 1024
 BANK = 1
 BCH = 8
 ERASED = b'\xfe' * CHUNKS
@@ -75,14 +75,13 @@ class Page(object):
 
 
 def choose_row(rng, pages_per_block, blocks):
-    """A row above 1024 and outside block 0. The value is not a constant."""
+    """A page greater than 1023. The block is not limited. The value is not a constant."""
     if pages_per_block < 1 or blocks < 1:
         raise SuiteError('NAND geometry is empty')
     span = pages_per_block * blocks
-    start = max(ROW_MIN, pages_per_block)
-    if start >= span:
-        raise SuiteError('geometry has no page above row 1024 outside block 0')
-    return rng.randrange(start, span)
+    if PAGE_MIN >= span:
+        raise SuiteError('geometry has no page greater than 1023')
+    return rng.randrange(PAGE_MIN, span)
 
 
 def require_geometry(geo):
@@ -261,7 +260,7 @@ def logical_lpn(meta):
     if len(meta) < META or meta[9] not in LOGICAL_TYPES:
         return None
     lpn = struct.unpack_from('<I', meta)[0]
-    if lpn == 0 or lpn == 0xffffffff:
+    if lpn < PAGE_MIN or lpn == 0xffffffff:
         return None
     return lpn
 
@@ -269,7 +268,7 @@ def logical_lpn(meta):
 def run_one_page(dev, rng, backup_dir, now=None):
     """Read one logical page with both drivers, program it from the CPU, and restore the block.
 
-    The page is the one whose spare names a logical page. Logical page 0 is skipped.
+    The page is the one whose spare names a logical page greater than 1023.
     The block is erased for the program and then restored.
     """
     dev.prepare()
