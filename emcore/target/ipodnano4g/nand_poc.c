@@ -269,6 +269,36 @@ static int batch_run(uint32_t bytes, uint32_t crc, uint32_t first)
     return 0;
 }
 
+/* Host wrote 4096 data bytes and 12 metadata bytes (10 used) at g_result. Backend stays FMSS for this call. */
+static int fmss_nand_job(const uint32_t *arg, uint32_t *result)
+{
+    const struct nand_geometry *g = nand_get_geometry();
+    uint32_t op = arg[0] & 0xff, ce = (arg[0] >> 8) & 0xf, row = arg[1];
+    unsigned int previous;
+    int rc;
+
+    *result = NPOC_R_OK;
+    if ((arg[0] >> 12) || arg[2] || (op != FMSS_NAND_ERASE && op != FMSS_NAND_PROGRAM)) {
+        *result = NPOC_R_BAD_ARG;
+        return 0;
+    }
+    if (!g || ce >= g->banks || !g->pagesperblock || row >= g->blocks * g->pagesperblock ||
+        (op == FMSS_NAND_ERASE && row % g->pagesperblock)) {
+        *result = NPOC_R_BAD_ARG;
+        return 0;
+    }
+    previous = nand_get_backend();
+    nand_set_backend(NAND_BACKEND_M2);
+    if (op == FMSS_NAND_ERASE)
+        rc = nand_erase_block(ce, row / g->pagesperblock);
+    else {
+        g_hal.cache_wb_inv(g_result, 0x1010);
+        rc = nand_write_page(ce, row, g_result, (const uint32_t *)(g_result + 0x1000));
+    }
+    nand_set_backend(previous);
+    return rc;
+}
+
 static void run_job(uint32_t kind, const uint32_t *arg)
 {
     uint32_t result = NPOC_R_OK;
@@ -310,6 +340,12 @@ static void run_job(uint32_t kind, const uint32_t *arg)
             S.job_detail[0] = det[0]; S.job_detail[1] = det[1];
             S.result_len = len;
         }
+    }
+    else if (kind == NPOC_JOB_FMSS_NAND) {
+        if (!need((1u << NPOC_STEP_GATES) | (1u << NPOC_STEP_PINS) | (1u << NPOC_STEP_FIL)))
+            result = NPOC_R_PRECOND;
+        else
+            rc = fmss_nand_job(arg, &result);
     }
     else if (!need(1u << NPOC_STEP_FIL)) result = NPOC_R_PRECOND;
     else if (kind == NPOC_JOB_READ_RESERVED) {
@@ -487,6 +523,7 @@ void nand_poc_usb_command(const uint32_t *buf, uint32_t *reply, const void **rep
     case NPOC_CMD_FMSS_PROBE: acc = queue(NPOC_JOB_FMSS_PROBE, buf[1], buf[2], 0); break;
     case NPOC_CMD_NAND_COMPARE: acc = queue(NPOC_JOB_NAND_COMPARE, buf[1], buf[2], buf[3]); break;
     case NPOC_CMD_CPU_NAND: acc = queue(NPOC_JOB_CPU_NAND, buf[1], buf[2], buf[3]); break;
+    case NPOC_CMD_FMSS_NAND: acc = queue(NPOC_JOB_FMSS_NAND, buf[1], buf[2], buf[3]); break;
     case NPOC_CMD_WRITE_INFO:
         reply[1] = reply[2] = reply[3] = 0; /* no legacy FTL/write staging API */
         return;

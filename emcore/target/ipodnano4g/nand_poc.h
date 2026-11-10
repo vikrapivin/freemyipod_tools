@@ -41,6 +41,10 @@
 #define NPOC_JOB_CPU_NAND 20u
 #define NPOC_CMD_NAND_COMPARE 143u
 #define NPOC_JOB_NAND_COMPARE 21u
+#define NPOC_CMD_FMSS_NAND 144u    /* program one page or erase one block with program.s / erase.s */
+#define NPOC_JOB_FMSS_NAND 22u
+#define FMSS_NAND_ERASE 1u
+#define FMSS_NAND_PROGRAM 2u
 #define N4G_PROBE_PROG 0x400u
 #define N4G_PROBE_OUT 0x20000u
 #define N4G_PROBE_SCRATCH 0x38000u

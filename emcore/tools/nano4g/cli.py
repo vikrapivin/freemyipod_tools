@@ -120,7 +120,15 @@ def parser():
                        help="compare one page with both readers and stop; no erase")
     suite.add_argument("--backup-dir", help="directory for the block backup (default: nand_device_suite/)")
     suite.add_argument("--restore", help="program this cpu-suite backup back and check it with the FMSS reader")
-    for command in (sub.choices['status'], step, page, ex, run, cn, suite):
+    fn = sub.add_parser("fmss-nand",
+                        help="program one page or erase one block with the FMSS programs (program.s / erase.s)")
+    fn.add_argument("action", choices=("write", "erase"))
+    fn.add_argument("--ce", type=int, default=0)
+    fn.add_argument("--block", type=lambda x: int(x, 0))
+    fn.add_argument("--page", type=lambda x: int(x, 0), default=0)
+    fn.add_argument("--in", dest="input", help="write: 4096 data bytes; a shorter file is padded with 0xff")
+    fn.add_argument("--meta", help="write: 10 metadata bytes as hex (default ff x 10)")
+    for command in (sub.choices['status'], step, page, ex, run, cn, suite, fn):
         command.add_argument('--usb', choices=('auto', 'bulk', 'control'), default='auto',
                              help='bulk on updated kernels; control is the slow diagnostic path')
     return ap
@@ -235,6 +243,48 @@ def mutating_families(s, selected, flag=None):
         except Exception:
             continue
     return out
+
+
+def fmss_nand_command(s, a):
+    """n4g.py fmss-nand write|erase: one page through program.s, or one block through erase.s."""
+    from .nand import stack_prepare
+    from .protocol import MUTATE, Cmd
+    if a.block is None:
+        raise ToolError('--block is required')
+    if not 0 <= a.ce < 8 or a.page < 0:
+        raise ToolError('invalid --ce or --page')
+    if a.action == 'erase' and a.page:
+        raise ToolError('erase acts on a whole block; omit --page')
+    if not s.probe_caps & MUTATE:
+        raise ToolError('FMSS program/erase requires the write-enabled kernel: python3 tools/n4g.py reload')
+    st = stack_prepare(s)
+    pages = st.geom[0] or 128
+    row = a.block * pages + a.page
+    if a.action == 'write':
+        if not a.input:
+            raise ToolError('write needs --in')
+        data = Path(a.input).read_bytes()
+        if len(data) > 4096:
+            raise ToolError('page data is 4096 bytes at most')
+        buf = bytearray(b'\xff' * 0x1010)
+        buf[:len(data)] = data
+        meta = b'\xff' * 10
+        if a.meta is not None:
+            meta = bytes.fromhex(a.meta)
+            if len(meta) != 10:
+                raise ToolError('--meta must be 10 bytes (20 hex digits)')
+        buf[0x1000:0x100a] = meta
+        s.write_memory(st.result_addr, bytes(buf))
+    op = 1 if a.action == 'erase' else 2
+    print('PLAN: FMSS %s CE%d block %d page %d row %d' % (a.action, a.ce, a.block, a.page, row), flush=True)
+    st = s.job(Cmd.NAND_FMSS_NAND, op | (a.ce & 0xf) << 8, row, timeout=30)
+    rc = st.job_lib_rc - (1 << 32) if st.job_lib_rc & 0x80000000 else st.job_lib_rc
+    print('FMSS %s CE%d block %d page %d row %d: rc %d' % (a.action, a.ce, a.block, a.page, row, rc))
+    if st.job_result == 2:
+        raise ToolError('steps 1, 2 and 4 have not finished')
+    if st.job_result == 3:
+        raise ToolError('address is past the chip')
+    return 0 if st.job_result == 0 and rc == 0 else 1
 
 
 def cpu_nand_command(s, a):
@@ -478,6 +528,8 @@ def main(argv=None):
             print(format_status(check(s.job(Cmd.NAND_STEP, a.number, 0))))
         elif a.command == "cpu-nand":
             return cpu_nand_command(s, a)
+        elif a.command == "fmss-nand":
+            return fmss_nand_command(s, a)
         elif a.command == "cpu-suite":
             from .cpu_suite import command
             return command(s, a.backup_dir, a.restore, read_only=a.read_only, one_page=a.one_page)
