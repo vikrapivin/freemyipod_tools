@@ -259,6 +259,10 @@ void synopsysotg_configure_ep(const struct usb_instance* instance, union usb_end
     }
     else
     {
+#ifdef TARGET_ipodnano4g
+        /* Keep OUT NAKing until start_rx has installed its DMA address/size. */
+        depctl.b.snak = 1;
+#endif
         data->core->outep_regs[ep.number].doepctl = depctl;
         data->core->dregs.daintmsk.ep.out |= (1 << ep.number);
     }

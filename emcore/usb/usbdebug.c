@@ -151,6 +151,9 @@ void usbdebug_bus_reset(const struct usb_instance* data, int configuration, int 
 void usbdebug_bulk_enable(const struct usb_instance* data, int interface, int altsetting)
 {
     usbdebug_enable(data, interface, altsetting);
+#ifdef TARGET_ipodnano4g
+    memset(bulk_state, 0, sizeof(bulk_state));
+#endif
     union usb_endpoint_number outep = { .number = USBDEBUG_ENDPOINT_OUT, .direction = USB_ENDPOINT_DIRECTION_OUT };
     union usb_endpoint_number inep = { .number = USBDEBUG_ENDPOINT_IN, .direction = USB_ENDPOINT_DIRECTION_IN };
     usb_configure_ep(data, outep, USB_ENDPOINT_TYPE_BULK, maxpacket);
@@ -201,8 +204,17 @@ bool usbdebug_bulk_handle_data(const struct usb_instance* data, union usb_endpoi
         bulk_state[bulk_ctrlreq_ep].addr = (void*)buf[1];
         bulk_state[bulk_ctrlreq_ep].size = buf[2];
         usb_set_stall(data, ep0out, true);
+#ifdef TARGET_ipodnano4g
+        /* The host can send OUT data as soon as the status ZLP completes.
+         * Arm RX before acknowledging the command, including the first write.
+         * IN keeps status first so it cannot fill a shared TX FIFO ahead of EP0. */
+        if (!bulk_ctrlreq_ep) usbdebug_bulk_xfer_complete(data, 0, 0, 0);
+        usb_ep0_start_tx(data, NULL, 0, NULL);
+        if (bulk_ctrlreq_ep) usbdebug_bulk_xfer_complete(data, 0, bulk_ctrlreq_ep, 0);
+#else
         usb_ep0_start_tx(data, NULL, 0, NULL);
         usbdebug_bulk_xfer_complete(data, 0, bulk_ctrlreq_ep, 0);  // Convenient way to start a transfer.
+#endif
         break;
     default:
         usb_set_stall(data, ep0out, true);
