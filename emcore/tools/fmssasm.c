@@ -55,9 +55,9 @@
  *   pst  [rA], rR              19  FMC-window word at byte offset rA = rR (3G)
  *   end                        00  stop, r6 is the result
  * Opcodes no original program uses, named after their behaviour on a nano 3G (-3 only):
- *   nop                        08  no operation
- *   nop2                       ff  no operation (an all-ones word, e.g. erased memory)
- *   wait2 N                    09  wait for condition N of a second list (5 and 33 are always true)
+ *   waitc [N[, arg, imm]]      08  condition N of opcode 08, default 0 (M2: 0..7 pass at once, 8..255 hold)
+ *   nop                        ff  no operation (an all-ones word, e.g. erased memory)
+ *   waitirq N                  09  wait for CPU interrupt request line N (3G: a second condition list; 5 and 33 are always true)
  *   jr   rA                    0f  jump to the byte offset held in rA
  *   sig                        10  set CS_IRQ b1 and continue
  *   pause                      12  stop and hand over to the CPU (it continues with the PC and a start)
@@ -76,7 +76,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define MAX_INSNS   4096
+/* Host-side array bound only. The device limit is the probe's program area
+ * (0x1fc00 bytes in SDRAM, checked by nano4g/protocol.py validate_probe;
+ * 4096 bytes when the program is copied to SRAM). */
+#define MAX_INSNS   (0x1fc00 / 8)
 #define MAX_LABELS  1024
 #define MAX_LINE    512
 #define MAX_FILES   16
@@ -121,6 +124,10 @@ static const struct name_value regs_3g[] =
 /* nano 4G / 5G */
 static const struct name_value regs_4g5g[] =
 {
+    /* Numeric names for discovery; these do not assign M1 semantics to M2. */
+    { "FMC_24", 0x024 }, { "FMC_28", 0x028 }, { "FMC_NSTAT", 0x04c },
+    { "FMC_DMA_CTRL", 0x038 }, { "FMSS_CTRL", 0xc00 }, { "FMSS_PROG", 0xc04 },
+    { "CS_STATUS", 0xc08 }, { "FMSS_C14", 0xc14 }, { "SEQ_RESULT", 0xc30 }, { "FMSS_PC", 0xc38 },
     { "FMC_CTRL0", 0x000 }, { "FMCTRL1", 0x004 }, { "FMC_CMD", 0x008 },
     { "FMC_ADDR0", 0x00c }, { "FMC_ADDR1", 0x010 }, { "FMC_DATA_SEL", 0x014 },
     { "FMC_18", 0x018 }, { "FMC_1C", 0x01c }, { "FMC_ANUM", 0x02c },
@@ -135,7 +142,8 @@ static const struct name_value regs_4g5g[] =
     { "P_DMALIST", 0xd20 }, { "P_STATS", 0xd24 }, { "P_CHUNKS", 0xd28 },
     { "P_ECCMODE", 0xd2c }, { "P_ECCCFG", 0xd30 }, { "P_SPARELEN", 0xd34 },
     { "P_HDRLEN", 0xd34 }, { "P_PARLEN", 0xd38 }, { "V_D3C", 0xd3c },
-    { "P_TIMING", 0xd4c },
+    { "P_TIMING", 0xd4c }, { "P_WTIMING", 0xd48 },
+    { "V_FAILCE", 0xd04 }, { "P_STATROW", 0xd78 }, { "V_D7C", 0xd7c },
 };
 
 static const struct name_value *regs = regs_4g5g;
@@ -148,8 +156,8 @@ enum { OP_END = 0x00, OP_WR = 0x01, OP_ST = 0x02, OP_LDI = 0x03, OP_LD = 0x04,
        OP_STI = 0x11, OP_SHL = 0x13, OP_SHR = 0x14, OP_BZ = 0x17,
        OP_PLD = 0x18, OP_PST = 0x19,
        /* nano 3G, named after their measured behaviour */
-       OP_NOP = 0x08, OP_WAIT2 = 0x09, OP_JR = 0x0f, OP_SIG = 0x10, OP_PAUSE = 0x12,
-       OP_TMWAIT = 0x15, OP_EVJMP = 0x16, OP_NOP2 = 0xff };
+       OP_WAITC = 0x08, OP_WAIT2 = 0x09, OP_JR = 0x0f, OP_SIG = 0x10, OP_PAUSE = 0x12,
+       OP_TMWAIT = 0x15, OP_EVJMP = 0x16, OP_NOP = 0xff };
 
 static const struct name_value opcodes[] =
 {
@@ -159,7 +167,7 @@ static const struct name_value opcodes[] =
     { "add", OP_ADD }, { "sub", OP_SUB }, { "bnz", OP_BNZ },
     { "sti", OP_STI }, { "shl", OP_SHL }, { "shr", OP_SHR }, { "bz", OP_BZ },
     { "pld", OP_PLD }, { "pst", OP_PST },
-    { "nop", OP_NOP }, { "nop2", OP_NOP2 }, { "wait2", OP_WAIT2 }, { "jr", OP_JR },
+    { "waitc", OP_WAITC }, { "nop", OP_NOP }, { "waitirq", OP_WAIT2 }, { "jr", OP_JR },
     { "sig", OP_SIG }, { "pause", OP_PAUSE }, { "tmwait", OP_TMWAIT }, { "evjmp", OP_EVJMP },
 };
 
@@ -267,13 +275,15 @@ static unsigned reg(const char *text)
         t[n - 1] = '\0';
         t = trim(t + 1);
     }
-    if (nano3g && !strcmp(t, "pc"))
+    /* r0..r7 are the GPRs; larger selectors are the measured extended roles (M2: source 8 = PC,
+     * source 10 = the destination, destination 10 = broadcast; M1 the same numbers), 'pc' = 8. */
+    if (!strcmp(t, "pc"))
         return 8;
     if (t[0] == 'r' && isdigit((unsigned char)t[1]))
     {
         char *end;
         unsigned long n = strtoul(t + 1, &end, 10);
-        if (!*end && n <= (nano3g ? 255 : 7))
+        if (!*end && n <= 255)
             return (unsigned)n;
     }
     fail("bad register '%s'", text);
@@ -352,28 +362,37 @@ static void encode(struct program *prog, char *stmt)
     if (i == sizeof(opcodes) / sizeof(opcodes[0]))
         fail("unknown instruction '%s'", mnem);
     op = opcodes[i].value;
-    if ((op == OP_PLD || op == OP_PST || op == OP_NOP || op == OP_NOP2 || op == OP_WAIT2 || op == OP_JR ||
-         op == OP_SIG || op == OP_PAUSE || op == OP_TMWAIT || op == OP_EVJMP) && !nano3g)
-        fail("'%s' is a nano 3G instruction (assemble with -3)", mnem);
+    /* pld/pst, waitc/nop, waitirq, jr, sig, pause, tmwait and evjmp are measured on both engines
+     * They assemble in either mode. */
     n = operands(trim(rest), ops);
 
     switch (op)
     {
         case OP_END:
+        case OP_WAITC:
         case OP_NOP:
-        case OP_NOP2:
         case OP_SIG:
         case OP_PAUSE:
         case OP_TMWAIT:
         case OP_EVJMP:
-            if (n)
-                fail("'%s' takes no operands", mnem);
+            /* no operands, or the raw fields R, arg, imm of the measured operand forms
+             * (e.g. 'evjmp 3, 0xd60, 0xd64', 'pause 2, 0xd60, 0xff00') */
+            if (n > 3)
+                fail("'%s' takes at most R, arg, imm", mnem);
+            if (n > 0) r = value(ops[0]);
+            if (n > 1) arg = value(ops[1]);
+            if (n > 2) imm = value(ops[2]);
             break;
         case OP_WAIT2:
+            /* waitirq N: interrupt request line N (VIC0 0..31); arg/imm ignored on M2 (M2-276) */
             need(n, 1); r = value(ops[0]);
+            if (n > 1) arg = value(ops[1]);
+            if (n > 2) imm = value(ops[2]);
             break;
         case OP_JR:
+            /* jr rTarget[, rCond]: M2 jumps to r[target] only if r[cond] != 0 (M2-110); cond defaults to r0 */
             need(n, 1); arg = reg(ops[0]);
+            if (n > 1) r = reg(ops[1]);
             break;
         case OP_WR:
             need(n, 2); arg = mmio(ops[0]); imm = value(ops[1]);
