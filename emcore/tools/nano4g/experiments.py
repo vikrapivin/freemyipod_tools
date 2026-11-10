@@ -154,6 +154,17 @@ def entries(include_followups=False):
     if include_followups:
         from .followup_experiments import entries as extra_entries
         yield from extra_entries()
+        # CPU-direct NAND jobs between resident sequencer phases (non-probe function family)
+        from .cpu_nand_experiments import entry as cpu_nand_entry
+        yield cpu_nand_entry()
+        # CPU-only NAND driver (cpu_nand_stack.c) against the sequencer driver, same family shape
+        from .cpu_stack_experiments import entry as cpu_stack_entry
+        yield cpu_stack_entry()
+        from .cpu_direct_experiments import entry as cpu_direct_entry
+        yield cpu_direct_entry()
+        from .driver_compare import entry as driver_compare_entry, profile_entry
+        yield driver_compare_entry()
+        yield profile_entry()
 
 
 def resolve(names):
