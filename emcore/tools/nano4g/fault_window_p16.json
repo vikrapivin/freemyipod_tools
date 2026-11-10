@@ -1,0 +1,1508 @@
+{
+ "estimated_saving_s": {
+  "margin4_floor16000": 1111.1,
+  "margin8_floor16000": 1111.1,
+  "margin8_floor4000": 1230.5
+ },
+ "families": {
+  "access": {
+   "blocked": "no timeout faults to shorten",
+   "cases": 3680,
+   "eligible": 3680,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 14,
+   "requests_sha256": "a7d9e85e816e7c9cabdbfdd6be2b785d28d93c41a919b547526d50fc7cc7bbce"
+  },
+  "alu": {
+   "blocked": "no timeout faults to shorten",
+   "cases": 9,
+   "eligible": 9,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 4,
+   "requests_sha256": "4b3c829ac9bf5243f2f4aff2a2137160ea1dbe923e5235bae195e6c1c23ac53d"
+  },
+  "b15ecc": {
+   "blocked": "no timeout faults to shorten",
+   "cases": 14,
+   "eligible": 14,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 14,
+   "requests_sha256": "97c859fc93c74cdfc2b75897d78782492c6a2de448c36f5afb14269545e2ac7c"
+  },
+  "blk100": {
+   "blocked": "no timeout faults to shorten",
+   "cases": 128,
+   "eligible": 128,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 4,
+   "requests_sha256": "c307d1c1688d2d20478df4ce257fb6ad998de001f479af611960cb76fee29b55"
+  },
+  "blk100b": {
+   "blocked": "no timeout faults to shorten",
+   "cases": 99,
+   "eligible": 99,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 39,
+   "requests_sha256": "80a60d91b641ce7c8c8174e1e777e2ae1a141ef02d6a66243eabeb2b465ccc45"
+  },
+  "branch": {
+   "blocked": "no timeout faults to shorten",
+   "cases": 7,
+   "eligible": 7,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 4,
+   "requests_sha256": "bb842dc3a2f60d01ee08763fdedc7bab6355774077ef3b0f975f09673b15b4fd"
+  },
+  "bufport": {
+   "blocked": "no timeout faults to shorten",
+   "cases": 24,
+   "eligible": 24,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 42,
+   "requests_sha256": "16b46b28df95f489346fdc6456fd6d294b566646801decab113554bb317d45f6"
+  },
+  "bufsize": {
+   "blocked": "no timeout faults to shorten",
+   "cases": 10,
+   "eligible": 10,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 9,
+   "requests_sha256": "8d06b7eabed95af2ac706f019890766959827594dec24d6c498208825b891a0f"
+  },
+  "c08": {
+   "blocked": "no eligible case with evidence",
+   "cases": 7,
+   "eligible": 0,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 0,
+   "requests_sha256": "0f040b6d8f74b1f3537df38cb158b49701cbfe3fa908a8e3bc04022dd319826a"
+  },
+  "c08self": {
+   "blocked": "no timeout faults to shorten",
+   "cases": 5,
+   "eligible": 5,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 7,
+   "requests_sha256": "5bf5c604c7f3b2ec98538b4c6431318ad9b0bfa5c272b8083d32ff64247e09a7"
+  },
+  "c14": {
+   "blocked": "no timeout faults to shorten",
+   "cases": 7,
+   "eligible": 3,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 4,
+   "requests_sha256": "37207855c1a46d048bc6377f5cfd03183c127aee85f1f641fa00a56bb512c554"
+  },
+  "c50": {
+   "cases": 4,
+   "eligible": 4,
+   "eligible_fault_us": 379774,
+   "eligible_timeout_faults": 3,
+   "max_event_us": 4,
+   "requests_sha256": "b1ac4d74eb799d62e04e177de03298ec0d5a2a9b670567815392d6aef4fa21f0"
+  },
+  "c50b8": {
+   "blocked": "no timeout faults to shorten",
+   "cases": 14,
+   "eligible": 14,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 7,
+   "requests_sha256": "3e66a6ae2367988f27cd932de6b47c3aec478ba449928bd4f27c9cb9b586ca35"
+  },
+  "c50fault": {
+   "cases": 8,
+   "eligible": 4,
+   "eligible_fault_us": 506354,
+   "eligible_timeout_faults": 4,
+   "max_event_us": 0,
+   "requests_sha256": "448f1f72a49c2d663769297b95714bccb6008d8f2e5abea1fddd723ca4e558b2"
+  },
+  "c50x": {
+   "cases": 3,
+   "eligible": 2,
+   "eligible_fault_us": 126446,
+   "eligible_timeout_faults": 1,
+   "max_event_us": 4,
+   "requests_sha256": "93d55ce667030e7332f0f43327900235c9bdc1024fb9e5c1203d0ed4f69c32f4"
+  },
+  "c58": {
+   "cases": 37,
+   "eligible": 37,
+   "eligible_fault_us": 4683880,
+   "eligible_timeout_faults": 37,
+   "max_event_us": 0,
+   "requests_sha256": "4f62667799111c9feec05a6e36f8f8c1fe9261b5244c2b086b9897f3d65c2167"
+  },
+  "c58b1": {
+   "blocked": "no timeout faults to shorten",
+   "cases": 28,
+   "eligible": 28,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 5,
+   "requests_sha256": "7f63c08749cc44cfbab64d4634735d00d38111402ad1bc37b4500c82404fccbf"
+  },
+  "c58b2": {
+   "blocked": "no timeout faults to shorten",
+   "cases": 29,
+   "eligible": 29,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 4,
+   "requests_sha256": "1571a264dab97877d52a6844060066b1acdec8d12b69da48c4c07c69c0c70221"
+  },
+  "c58ill": {
+   "cases": 5,
+   "eligible": 5,
+   "eligible_fault_us": 632960,
+   "eligible_timeout_faults": 5,
+   "max_event_us": 0,
+   "requests_sha256": "933dbc326061ce161ad91fa922720cbee1d0b6bb9d346d5fc54e90378676c4dc"
+  },
+  "ch1buf": {
+   "cases": 8,
+   "eligible": 8,
+   "eligible_fault_us": 505796,
+   "eligible_timeout_faults": 4,
+   "max_event_us": 9,
+   "requests_sha256": "5e8245c6a5346d1aad9efe8bd733b8e030588b967010c4ff16fa3e0cc45fd5b8"
+  },
+  "chan1": {
+   "cases": 8,
+   "eligible": 8,
+   "eligible_fault_us": 505798,
+   "eligible_timeout_faults": 4,
+   "max_event_us": 6,
+   "requests_sha256": "b2f0cd8959870de4f639ec9df73840661a1733ced8ccda714eb98bbd33eadf82"
+  },
+  "chan1pins": {
+   "cases": 8,
+   "eligible": 8,
+   "eligible_fault_us": 505796,
+   "eligible_timeout_faults": 4,
+   "max_event_us": 6,
+   "requests_sha256": "b2f0cd8959870de4f639ec9df73840661a1733ced8ccda714eb98bbd33eadf82"
+  },
+  "clock": {
+   "blocked": "no timeout faults to shorten",
+   "cases": 2,
+   "eligible": 2,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 1355,
+   "requests_sha256": "c4d8907b8d21e44330379a69d44d46ff0b4a47365e709cfbafecdd5c3f05dc0f"
+  },
+  "control": {
+   "blocked": "no timeout faults to shorten",
+   "cases": 1,
+   "eligible": 1,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 5,
+   "requests_sha256": "44ac8b093e9a7edea8889d96e0d74dc3491b100ca09c41b84aa8287f944f7476"
+  },
+  "ctrlbits": {
+   "blocked": "no eligible case with evidence",
+   "cases": 37,
+   "eligible": 0,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 0,
+   "requests_sha256": "e8c5e425ea356d122a6e75024124d12803eaac664268a9a11e2b023c62e44383"
+  },
+  "ctrlfx": {
+   "blocked": "no eligible case with evidence",
+   "cases": 48,
+   "eligible": 0,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 0,
+   "requests_sha256": "736eb4ad525d4bef507d2e7a0d9fd78327ad40a5819c7acaaa744398d650d13c"
+  },
+  "ctrlhold": {
+   "blocked": "no eligible case with evidence",
+   "cases": 13,
+   "eligible": 0,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 0,
+   "requests_sha256": "6d4f9fc591739506f07e72d292ad3c1d59b2e72c44429e67772e03282da2da8e"
+  },
+  "ctrlwords": {
+   "blocked": "no timeout faults to shorten",
+   "cases": 24,
+   "eligible": 24,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 7,
+   "requests_sha256": "26c39b7620759ba0f1bbf334803c56e7c273908bc7218bfa18a48c8c8b974713"
+  },
+  "dmactl": {
+   "cases": 42,
+   "eligible": 40,
+   "eligible_fault_us": 2025410,
+   "eligible_timeout_faults": 16,
+   "max_event_us": 667,
+   "requests_sha256": "c9f1db1a4464b08821b247d28f7dd0c698d866ffa43ec1951506a1ba226d1b1e"
+  },
+  "dmaloop": {
+   "blocked": "no timeout faults to shorten",
+   "cases": 8,
+   "eligible": 8,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 36,
+   "requests_sha256": "c718e27ba9c8746fd798929560c911a47a902ee5764710219efe0262ac4b80a4"
+  },
+  "done5": {
+   "blocked": "no timeout faults to shorten",
+   "cases": 58,
+   "eligible": 58,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 29,
+   "requests_sha256": "e09bd3610ea9aecd29df0088982132e87e011f0b1446805b57b7e025c0ef2dfe"
+  },
+  "done5b": {
+   "blocked": "no timeout faults to shorten",
+   "cases": 24,
+   "eligible": 24,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 26,
+   "requests_sha256": "fd11323f9442b7925bac0a3e873b7383e843c36284cf75dabf9f713d3d5af9e3"
+  },
+  "eccchunk": {
+   "blocked": "no timeout faults to shorten",
+   "cases": 4,
+   "eligible": 2,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 627,
+   "requests_sha256": "b17ae8de9baf36f28aa87bea4079577a8b5d41cb655efbf98d101e0b007af60d"
+  },
+  "eccchunk2": {
+   "blocked": "no timeout faults to shorten",
+   "cases": 48,
+   "eligible": 16,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 629,
+   "requests_sha256": "f087a5d75c39e6a2b45e1460f16084f64982124ffebf506f6c002cf660827298"
+  },
+  "eccmode": {
+   "blocked": "no timeout faults to shorten",
+   "cases": 36,
+   "eligible": 36,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 30,
+   "requests_sha256": "0a203da00df598cb4aa3d0097397fd7f904144a4dea75e1bac0b5a3a86445605"
+  },
+  "eccmode2": {
+   "blocked": "no timeout faults to shorten",
+   "cases": 132,
+   "eligible": 132,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 22,
+   "requests_sha256": "a833dd56ffafd72032d9f210474bf2049307efef76875e6a2d753919cf6003c4"
+  },
+  "eccmode3": {
+   "blocked": "no timeout faults to shorten",
+   "cases": 40,
+   "eligible": 40,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 27,
+   "requests_sha256": "74496cc90c8d3aef7963113b25f2a92cccb1d10536efb2939a589ea176599e9c"
+  },
+  "eccmode4": {
+   "blocked": "no timeout faults to shorten",
+   "cases": 24,
+   "eligible": 24,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 14,
+   "requests_sha256": "84712d90777402d08cb5dde097209e492951201883f92e208f3fd84c54820aee"
+  },
+  "eccpar": {
+   "blocked": "no timeout faults to shorten",
+   "cases": 12,
+   "eligible": 12,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 29,
+   "requests_sha256": "ba098b5b64d232819d2b629c8b1be4855631281e7ca1baec819959ae7719e409"
+  },
+  "eccregs": {
+   "blocked": "no timeout faults to shorten",
+   "cases": 15,
+   "eligible": 15,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 29,
+   "requests_sha256": "afd2240efbda1db7d56ed32d976ef3a57a0a668913db6bc43bd39658cc51f437"
+  },
+  "eccstr": {
+   "blocked": "no timeout faults to shorten",
+   "cases": 68,
+   "eligible": 68,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 30,
+   "requests_sha256": "cc37c713ea3b56a32785874cc026a2f53ff81ef6ef865f19aa219b4789aef9c4"
+  },
+  "eccstr2": {
+   "blocked": "no timeout faults to shorten",
+   "cases": 134,
+   "eligible": 134,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 29,
+   "requests_sha256": "69632c8311f5d8285006d1d0d74467d5e15c911087786c97ae82c38e0287a58c"
+  },
+  "eraseseq": {
+   "blocked": "no timeout faults to shorten",
+   "cases": 20,
+   "eligible": 4,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 577,
+   "requests_sha256": "f81b29a3e4bedd5f09aa611c4b9937733dc6e3cf14b52ec94f5b09c83c174bf3"
+  },
+  "ev11": {
+   "cases": 8,
+   "eligible": 4,
+   "eligible_fault_us": 253182,
+   "eligible_timeout_faults": 2,
+   "max_event_us": 5,
+   "requests_sha256": "8162463913a295763b2b9a4e1b16a349b355d5bc3190fe0e7d86944ed2ccbf4f"
+  },
+  "ev5": {
+   "cases": 4,
+   "eligible": 2,
+   "eligible_fault_us": 253182,
+   "eligible_timeout_faults": 2,
+   "max_event_us": 0,
+   "requests_sha256": "065c8c942ee6d85a1e56516c63c1274eb97ebb2dda9a53450981b85e4d814037"
+  },
+  "ev5arm": {
+   "cases": 16,
+   "eligible": 16,
+   "eligible_fault_us": 1012726,
+   "eligible_timeout_faults": 8,
+   "max_event_us": 8,
+   "requests_sha256": "7dc7fd9e758c9dcf44a119c4283bbf3f9995ca9609d705356d0d4f6e39b926ea"
+  },
+  "ev5en": {
+   "cases": 24,
+   "eligible": 24,
+   "eligible_fault_us": 3038196,
+   "eligible_timeout_faults": 24,
+   "max_event_us": 0,
+   "requests_sha256": "5e42c9b07f5f945653f1e90d9fba20ff54ce1280d3695d24005a22966caf6088"
+  },
+  "ev5ready": {
+   "cases": 18,
+   "eligible": 16,
+   "eligible_fault_us": 1012734,
+   "eligible_timeout_faults": 8,
+   "max_event_us": 8,
+   "requests_sha256": "7f68d9ca18e8b236efedef8e51a7d83cf0ba0b3f939ce7dbc984754cc1ca8511"
+  },
+  "ev5rule": {
+   "cases": 16,
+   "eligible": 16,
+   "eligible_fault_us": 1012732,
+   "eligible_timeout_faults": 8,
+   "max_event_us": 8,
+   "requests_sha256": "7dc7fd9e758c9dcf44a119c4283bbf3f9995ca9609d705356d0d4f6e39b926ea"
+  },
+  "ev5t": {
+   "cases": 6,
+   "eligible": 6,
+   "eligible_fault_us": 759546,
+   "eligible_timeout_faults": 6,
+   "max_event_us": 0,
+   "requests_sha256": "7542ab5c7eef321ffba9e3d1c08cb4281edc3b06d2d156eff747aa83df23ec7f"
+  },
+  "ev5two": {
+   "blocked": "no eligible case with evidence",
+   "cases": 6,
+   "eligible": 0,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 0,
+   "requests_sha256": "bc6c096f54dec7bcaf9e98f6c16cb150385ce248be034d20d0ee5d093c38c43e"
+  },
+  "ev8": {
+   "cases": 8,
+   "eligible": 8,
+   "eligible_fault_us": 505796,
+   "eligible_timeout_faults": 4,
+   "max_event_us": 6,
+   "requests_sha256": "b2f0cd8959870de4f639ec9df73840661a1733ced8ccda714eb98bbd33eadf82"
+  },
+  "evclear": {
+   "blocked": "no timeout faults to shorten",
+   "cases": 12,
+   "eligible": 12,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 8,
+   "requests_sha256": "97397109d1622192e04f2b7c990acb5d3b834590e60921ecb0a4046715860138"
+  },
+  "evcons": {
+   "cases": 80,
+   "eligible": 80,
+   "eligible_fault_us": 8861384,
+   "eligible_timeout_faults": 70,
+   "max_event_us": 13,
+   "requests_sha256": "bcdb5fbb052692b8c9efff2cd3a28b99224349cde815822934732f97bdfd4071"
+  },
+  "evsweep": {
+   "cases": 128,
+   "eligible": 112,
+   "eligible_fault_us": 12532578,
+   "eligible_timeout_faults": 99,
+   "max_event_us": 13,
+   "requests_sha256": "1ca60b5c9e288c3b09fe010597dc3c3be01265baab7a66b938879b0698752e60"
+  },
+  "evsweep2": {
+   "cases": 3072,
+   "eligible": 2036,
+   "eligible_fault_us": 256474246,
+   "eligible_timeout_faults": 2026,
+   "max_event_us": 13,
+   "requests_sha256": "048e691707759ab1166715efea83892e9e713b9b70a4508c620d5ba4204728b1"
+  },
+  "evsweep3": {
+   "cases": 2560,
+   "eligible": 2036,
+   "eligible_fault_us": 256474344,
+   "eligible_timeout_faults": 2026,
+   "max_event_us": 13,
+   "requests_sha256": "a4ce580b44dc4c6a0eb896e9dfa0a326cbb1f5a72b52b1bc40a1ba986131f770"
+  },
+  "fields0": {
+   "blocked": "no timeout faults to shorten",
+   "cases": 21,
+   "eligible": 17,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 5,
+   "requests_sha256": "632d0d7c09a7161c332f3a567393830c2d286a6bc375b2e4e940693119a45ff2"
+  },
+  "finale": {
+   "cases": 387,
+   "eligible": 381,
+   "eligible_fault_us": 15444154,
+   "eligible_timeout_faults": 122,
+   "max_event_us": 35,
+   "requests_sha256": "b4e5e74844b3ebf9628afbe6434cc7a8ec58c726f4fcdaecc777b051e192267b"
+  },
+  "fmc28": {
+   "blocked": "no timeout faults to shorten",
+   "cases": 11,
+   "eligible": 9,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 19,
+   "requests_sha256": "8331a2f90593cb0378f45e882245ab90a19160495e0aaabfb653a6df79860a95"
+  },
+  "fmc28b": {
+   "cases": 10,
+   "eligible": 10,
+   "eligible_fault_us": 253184,
+   "eligible_timeout_faults": 2,
+   "max_event_us": 6,
+   "requests_sha256": "5231894cd0fbc84d696a94fd6e9d49bcc2cd0d13fbbb549eb7bd3bafd1db9724"
+  },
+  "fmcbits": {
+   "cases": 9,
+   "eligible": 7,
+   "eligible_fault_us": 253180,
+   "eligible_timeout_faults": 2,
+   "max_event_us": 666,
+   "requests_sha256": "dcea026b6f8da59e75eae428d71380f0271951aadea8af65f4363f9297755c7d"
+  },
+  "fmcmap": {
+   "blocked": "no eligible case with evidence",
+   "cases": 1,
+   "eligible": 0,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 0,
+   "requests_sha256": "e7e987b8deec005551a23db48eb70d632d334ce17d8103e3a88462dc7ffacb16"
+  },
+  "fmcstat": {
+   "blocked": "no timeout faults to shorten",
+   "cases": 32,
+   "eligible": 32,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 7,
+   "requests_sha256": "549dd7b7244714b260af732ae7d02824bdf7a89216da0f715bbc77fe02784f3e"
+  },
+  "fmcstat2": {
+   "blocked": "no timeout faults to shorten",
+   "cases": 8,
+   "eligible": 8,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 8,
+   "requests_sha256": "107e840a8c90e4bc7bd6e69518f16b28a01a9c283dc9bf6ecc39f0c159c8a509"
+  },
+  "fullpage": {
+   "blocked": "no timeout faults to shorten",
+   "cases": 42,
+   "eligible": 42,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 586,
+   "requests_sha256": "bc9257e1ac006487681b7b2b8ad7b3dfd4b1d9524e09e890bad906ca47ffd053"
+  },
+  "fwidth": {
+   "blocked": "no timeout faults to shorten",
+   "cases": 18,
+   "eligible": 14,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 4,
+   "requests_sha256": "ebb6ee02f1d383de5c092525742f1801b349b43f21b4ccad7d461936ebaa9b1f"
+  },
+  "holdout": {
+   "cases": 7,
+   "eligible": 5,
+   "eligible_fault_us": 253182,
+   "eligible_timeout_faults": 2,
+   "max_event_us": 10,
+   "requests_sha256": "b20a20d397b85a6d16d56f370ed528032797baab5ec6eb7a291bb66bd90d8ae9"
+  },
+  "indirect": {
+   "blocked": "no eligible case with evidence",
+   "cases": 4,
+   "eligible": 0,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 0,
+   "requests_sha256": "1ad75c5ffcfc4fa9ce1204ac4fdf67a402671af78c35438886d89adc69eb8372"
+  },
+  "irq044": {
+   "blocked": "no timeout faults to shorten",
+   "cases": 792,
+   "eligible": 792,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 30,
+   "requests_sha256": "64bd24708d65e190c76c250c55314f1a380f1c7ca04542eae70e3f617046e082"
+  },
+  "irqen": {
+   "blocked": "no timeout faults to shorten",
+   "cases": 264,
+   "eligible": 264,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 9,
+   "requests_sha256": "7e5eb78f2802fc1b29085c38f9d867395293ef9edab56e8308822af5cde477b3"
+  },
+  "irqline": {
+   "blocked": "no eligible case with evidence",
+   "cases": 8,
+   "eligible": 0,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 0,
+   "requests_sha256": "d6af39c10ac0222b8ed0faedede7497b98b597515c87e606d6b8c78c1452e1ac"
+  },
+  "irqop": {
+   "cases": 48,
+   "eligible": 48,
+   "eligible_fault_us": 6076392,
+   "eligible_timeout_faults": 48,
+   "max_event_us": 0,
+   "requests_sha256": "1c5d7fe9c6a3f497352ab3018c458c5de1f47338e536a999807d2271f79a5979"
+  },
+  "irqsrc": {
+   "blocked": "no timeout faults to shorten",
+   "cases": 136,
+   "eligible": 136,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 9,
+   "requests_sha256": "3c5fda03c55c4d0feef99db1150f6ac203b431d4d5644f7a037b729fe592c4e6"
+  },
+  "latchrep": {
+   "cases": 2560,
+   "eligible": 2560,
+   "eligible_fault_us": 162036998,
+   "eligible_timeout_faults": 1280,
+   "max_event_us": 17,
+   "requests_sha256": "a10a2e18eb39558552b24a2ff5e7c80eb8c1fcbadd8ad6462fc952e8da8c670c"
+  },
+  "m2_c58_bits": {
+   "blocked": "no timeout faults to shorten",
+   "cases": 68,
+   "eligible": 68,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 5,
+   "requests_sha256": "aab306af7b3c94e462d5e4c92b0e158a4cf65f4d866b4b38d548a6fca102fcf0"
+  },
+  "m2_ce_conditions": {
+   "cases": 432,
+   "eligible": 405,
+   "eligible_fault_us": 48990966,
+   "eligible_timeout_faults": 387,
+   "max_event_us": 4,
+   "requests_sha256": "51b65b1d3479c815ef9b7e16ec26552223bd924df8f5e0356520c17ed0a3442b"
+  },
+  "m2_delayed_vector": {
+   "blocked": "no eligible case with evidence",
+   "cases": 36,
+   "eligible": 0,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 0,
+   "requests_sha256": "3c5d43b32b29c421a49ad9893ba87147bb6a1e92680477f09ad42c358a7f4d0c"
+  },
+  "m2_dma_ecc_overlap": {
+   "blocked": "no timeout faults to shorten",
+   "cases": 24,
+   "eligible": 24,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 21,
+   "requests_sha256": "ef70556f0c6744dee086bdfceaa203c41fe6b3362b1165a7fb2a32a2231ebd59"
+  },
+  "m2_ecc_sequence": {
+   "blocked": "no timeout faults to shorten",
+   "cases": 20,
+   "eligible": 20,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 40,
+   "requests_sha256": "043bfe77f344d023307e63c9c2ef05c39c30d58e5dedcea3d76c3bc292335f28"
+  },
+  "m2_fifo_access": {
+   "blocked": "no timeout faults to shorten",
+   "cases": 12,
+   "eligible": 6,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 11,
+   "requests_sha256": "80cbf0f6412ae3f321f93e136fc930e04982b51c1ba09720d639a6a08479a7f6"
+  },
+  "m2_nested_fault": {
+   "cases": 12,
+   "eligible": 6,
+   "eligible_fault_us": 759546,
+   "eligible_timeout_faults": 6,
+   "max_event_us": 0,
+   "requests_sha256": "3708004b3d3bfb05b13495fcdfa97a3302bd847409885e27caf5a7295342163f"
+  },
+  "m2_opcode_confirm": {
+   "cases": 531,
+   "eligible": 524,
+   "eligible_fault_us": 1898876,
+   "eligible_timeout_faults": 15,
+   "max_event_us": 13,
+   "requests_sha256": "f9dd709e6c839861a2b1149d829ac0f9b5d2342b69c804abb8bd8f6a8be6d8db"
+  },
+  "m2_opcode_m1": {
+   "cases": 78,
+   "eligible": 24,
+   "eligible_fault_us": 759550,
+   "eligible_timeout_faults": 6,
+   "max_event_us": 7,
+   "requests_sha256": "0b3b4986fc2f8454e805e46d379941d15dffaf9208381483306808a08234492a"
+  },
+  "m2_opcode_scan": {
+   "cases": 1422,
+   "eligible": 18,
+   "eligible_fault_us": 759536,
+   "eligible_timeout_faults": 6,
+   "max_event_us": 5,
+   "requests_sha256": "54e6b3bdd0df637f6ecca1b193f7dd7167f926d94d40d4ef092f8e50e1fe16ff"
+  },
+  "m2_opcode_states": {
+   "cases": 105,
+   "eligible": 45,
+   "eligible_fault_us": 1898844,
+   "eligible_timeout_faults": 15,
+   "max_event_us": 7,
+   "requests_sha256": "b05000f552bcfea8154bc73c9f21c1f11981c83993fee9c0c675185d98b9d930"
+  },
+  "m2_pause_state": {
+   "blocked": "no timeout faults to shorten",
+   "cases": 12,
+   "eligible": 1,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 4,
+   "requests_sha256": "375bae4671ac5cfe5b0e86134d3ee772a3b241407d828d152ccc1877f94d561d"
+  },
+  "m2_pram_alias": {
+   "blocked": "no eligible case with evidence",
+   "cases": 100,
+   "eligible": 0,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 0,
+   "requests_sha256": "dfff5f5cc348340dff66819265c0aaf68a96753bad46fa1e4e63bca50689e19a"
+  },
+  "m2_recovery": {
+   "blocked": "no timeout faults to shorten",
+   "cases": 9,
+   "eligible": 5,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 4,
+   "requests_sha256": "cb9655008a8fe0f5205ced42d7c2260fe19fe7139bf4e46e5ec2434bc437f1bb"
+  },
+  "m2_reg10": {
+   "blocked": "no timeout faults to shorten",
+   "cases": 64,
+   "eligible": 64,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 17,
+   "requests_sha256": "42ed1f55c813d1fad2076aa7a95b9f61fd29869c56e29571a93477b70ac655b6"
+  },
+  "m2_regaddr": {
+   "blocked": "no eligible case with evidence",
+   "cases": 255,
+   "eligible": 0,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 0,
+   "requests_sha256": "4b2cf9422022daa3323c20f796fc4980b3c0e2e822212e21332c12fdf0f5b876"
+  },
+  "m2_regbranch": {
+   "blocked": "no timeout faults to shorten",
+   "cases": 256,
+   "eligible": 256,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 6,
+   "requests_sha256": "d7ac8d4813369c7f0dda005427899416472e81675901f85d01452cddb2f354b5"
+  },
+  "m2_regbus": {
+   "blocked": "no timeout faults to shorten",
+   "cases": 3,
+   "eligible": 2,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 4,
+   "requests_sha256": "aff704f8c0ad2328b32ab4fca7fbf0a36bc0f96e3fd3451f38132ca41d683483"
+  },
+  "m2_regdest": {
+   "blocked": "no timeout faults to shorten",
+   "cases": 258,
+   "eligible": 258,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 6,
+   "requests_sha256": "9eef882f5de2365eb5ed44a9e566f8bce204a50ac610205386c9f53b2e027878"
+  },
+  "m2_regjr": {
+   "blocked": "no eligible case with evidence",
+   "cases": 256,
+   "eligible": 0,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 0,
+   "requests_sha256": "70131521a60bea0366991facf93012e5039734a07ac87fe1b19d30ae2b9935a3"
+  },
+  "m2_regsrc": {
+   "blocked": "no timeout faults to shorten",
+   "cases": 256,
+   "eligible": 256,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 19,
+   "requests_sha256": "4f84b9104ae2ced9a84a7e6a4d865161d911e9d022c7746913c491710fd4505a"
+  },
+  "m2_regst": {
+   "blocked": "no timeout faults to shorten",
+   "cases": 287,
+   "eligible": 284,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 5,
+   "requests_sha256": "42d355490f702ad55668c7643aee935f5a5ed2789a13ccd7492bba4d5e8e49e4"
+  },
+  "m2_resetcheck": {
+   "blocked": "no timeout faults to shorten",
+   "cases": 7,
+   "eligible": 4,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 5,
+   "requests_sha256": "9ae81ce653ce4d82a47873fc95bc06108ba534c22ff40175f8e98022e234a9f8"
+  },
+  "m2_resetpram": {
+   "blocked": "eligible case running-control neither ended nor faulted",
+   "cases": 8,
+   "eligible": 1,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 0,
+   "requests_sha256": "64b23f38b545d4712704fa94e208857a0519d65a166b7ccc8738e6559e2b8955"
+  },
+  "m2_shifts": {
+   "blocked": "no timeout faults to shorten",
+   "cases": 168,
+   "eligible": 168,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 4,
+   "requests_sha256": "9acd8c9a7e2983fbe40ea0dab4b41ce1e9518b28dfdf7e66588c363d2ceed472"
+  },
+  "m2_status_order": {
+   "cases": 33,
+   "eligible": 33,
+   "eligible_fault_us": 1645694,
+   "eligible_timeout_faults": 13,
+   "max_event_us": 12,
+   "requests_sha256": "715702dfd3cedd65b81224f48238e21951ea6037dba0c5aab4b2c85340fd596e"
+  },
+  "m2_status_recovery": {
+   "cases": 7,
+   "eligible": 7,
+   "eligible_fault_us": 379776,
+   "eligible_timeout_faults": 3,
+   "max_event_us": 5,
+   "requests_sha256": "2439aef6a1be59cb41783f89fde01c3c4ab735a81ae4bcc0ed1f3744d7c3e6b6"
+  },
+  "m2_waitcons": {
+   "cases": 80,
+   "eligible": 80,
+   "eligible_fault_us": 2405222,
+   "eligible_timeout_faults": 19,
+   "max_event_us": 126598,
+   "requests_sha256": "fa325ab3f4ba9482d646b08e8bcbfe60bc07d5975a422c84fbb7e8838f5b3a0f"
+  },
+  "m2_wedge": {
+   "blocked": "no timeout faults to shorten",
+   "cases": 59,
+   "eligible": 59,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 4,
+   "requests_sha256": "656644fece7a202a8e09274fa7474fab32b43a5756b68a8648bea66aaee836c4"
+  },
+  "memory": {
+   "blocked": "no timeout faults to shorten",
+   "cases": 1,
+   "eligible": 1,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 4,
+   "requests_sha256": "37c565d5e9951c5c8170aeb23d75a5f056d8803a899ea01e4008c973ebdd6e59"
+  },
+  "miscorr": {
+   "blocked": "no timeout faults to shorten",
+   "cases": 2080,
+   "eligible": 2080,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 327,
+   "requests_sha256": "ddf2569584b01027b2a7c3220dcca0abe0db838145b98f96e80db78653ff5356"
+  },
+  "oneshot": {
+   "cases": 4,
+   "eligible": 4,
+   "eligible_fault_us": 253184,
+   "eligible_timeout_faults": 2,
+   "max_event_us": 4,
+   "requests_sha256": "a840696e56f2a5541c992e7f82f870ab7305bc1c96fd9605dd56603edfbc8a24"
+  },
+  "op09": {
+   "cases": 320,
+   "eligible": 155,
+   "eligible_fault_us": 17849414,
+   "eligible_timeout_faults": 141,
+   "max_event_us": 13,
+   "requests_sha256": "26262ae24c873a35faf3e28f2e42b62d01deee61d251b90555121e404b4af086"
+  },
+  "op0916": {
+   "cases": 55,
+   "eligible": 22,
+   "eligible_fault_us": 2658408,
+   "eligible_timeout_faults": 21,
+   "max_event_us": 3,
+   "requests_sha256": "75bea0f7f8504ddf66902ce7df7d598c4fca0c4a2333fd45aeb61afc8ea83e60"
+  },
+  "op09b": {
+   "cases": 288,
+   "eligible": 186,
+   "eligible_fault_us": 21520578,
+   "eligible_timeout_faults": 170,
+   "max_event_us": 4,
+   "requests_sha256": "1e26f3f64376b09d40e7f49a3e58dd80e15f3e018ad58feb68b57f88e6941d64"
+  },
+  "op09c": {
+   "cases": 128,
+   "eligible": 122,
+   "eligible_fault_us": 14811214,
+   "eligible_timeout_faults": 117,
+   "max_event_us": 4,
+   "requests_sha256": "2d58d3688fd3ece853a11bb17a1d9a38f53e5772b64786c2b5fe45d002b18ed6"
+  },
+  "op09d": {
+   "cases": 8,
+   "eligible": 8,
+   "eligible_fault_us": 505794,
+   "eligible_timeout_faults": 4,
+   "max_event_us": 6,
+   "requests_sha256": "b2f0cd8959870de4f639ec9df73840661a1733ced8ccda714eb98bbd33eadf82"
+  },
+  "op09nand": {
+   "cases": 1024,
+   "eligible": 506,
+   "eligible_fault_us": 63802122,
+   "eligible_timeout_faults": 504,
+   "max_event_us": 5,
+   "requests_sha256": "a539f70791bfcd7ba141af1072274f51d9104baaf4298a55953e1a036b4458dc"
+  },
+  "op09w33": {
+   "cases": 48,
+   "eligible": 24,
+   "eligible_fault_us": 2785008,
+   "eligible_timeout_faults": 22,
+   "max_event_us": 5,
+   "requests_sha256": "842c103e78fa7d082b5e7e3fd184152feaf50a06b3b35cd3e71977a3b7100883"
+  },
+  "op0f": {
+   "blocked": "no eligible case with evidence",
+   "cases": 6,
+   "eligible": 0,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 0,
+   "requests_sha256": "9e67345a77b93217594f3af7dd4ea81e0ab82792d1e94142a4d3d7e331ed3b58"
+  },
+  "op10": {
+   "blocked": "no timeout faults to shorten",
+   "cases": 1,
+   "eligible": 1,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 4,
+   "requests_sha256": "b5053645d946176c0cc71100fa508c18d5094e17f2b043b6982d3895e2d32c00"
+  },
+  "op12": {
+   "blocked": "no eligible case with evidence",
+   "cases": 8,
+   "eligible": 0,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 0,
+   "requests_sha256": "a7b0effd92f8e148a8a52380ca132e7f9f892461501a30b4dcbe2f49275d9ebf"
+  },
+  "op12ack": {
+   "blocked": "no eligible case with evidence",
+   "cases": 8,
+   "eligible": 0,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 0,
+   "requests_sha256": "c744c2e2a57b9403beb48c9b2b0ca251b17d3b621e92ba4bddbffc665a05cee5"
+  },
+  "op12cont": {
+   "blocked": "no eligible case with evidence",
+   "cases": 7,
+   "eligible": 0,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 0,
+   "requests_sha256": "27dd01e45fb2217ff65404ab848c01f98210380c0b77bc2169108a1e9751d9f9"
+  },
+  "op12rel": {
+   "blocked": "no eligible case with evidence",
+   "cases": 55,
+   "eligible": 0,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 0,
+   "requests_sha256": "96acecbd319557b5b9d3bd78207c577bc31f7499cfb47061c74446a8fb04b620"
+  },
+  "op12wait": {
+   "cases": 160,
+   "eligible": 80,
+   "eligible_fault_us": 8988004,
+   "eligible_timeout_faults": 71,
+   "max_event_us": 13,
+   "requests_sha256": "4b421571a438b95d46de471beb19f771ffeeda07915cd50bceb5b133be940876"
+  },
+  "op15": {
+   "blocked": "no eligible case with evidence",
+   "cases": 24,
+   "eligible": 0,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 0,
+   "requests_sha256": "7aa9c04cb962c0355b32298b662fabdc27544d16f189b43ea49cf9635b02fd70"
+  },
+  "op16": {
+   "cases": 14,
+   "eligible": 7,
+   "eligible_fault_us": 886142,
+   "eligible_timeout_faults": 7,
+   "max_event_us": 0,
+   "requests_sha256": "2477da05ec1c4336b031a4ea7fa6d3d97310e268dbda5ba45f4baa253db5c536"
+  },
+  "op16b": {
+   "blocked": "no eligible case with evidence",
+   "cases": 20,
+   "eligible": 0,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 0,
+   "requests_sha256": "b88e34bf5d070aea12f2a5a8fa4319a349157ea710f0abab6166c335a1ae72e6"
+  },
+  "opcost": {
+   "blocked": "no timeout faults to shorten",
+   "cases": 30,
+   "eligible": 26,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 214,
+   "requests_sha256": "4d1e2aaab481adc5eec3ce12d947858aba91894bcd3662c799c099da88ccaadd"
+  },
+  "opstate": {
+   "cases": 49,
+   "eligible": 21,
+   "eligible_fault_us": 886144,
+   "eligible_timeout_faults": 7,
+   "max_event_us": 8,
+   "requests_sha256": "619fd17aa3c29e2bc274338f1c2a0a35a9a1688ac94770294f05543a4d7c7912"
+  },
+  "opsweep": {
+   "cases": 717,
+   "eligible": 9,
+   "eligible_fault_us": 379770,
+   "eligible_timeout_faults": 3,
+   "max_event_us": 4,
+   "requests_sha256": "6c7f26adcafc4cca9b03e2d8be5fa8bed9006f03166767c496e334817e6285de"
+  },
+  "optime": {
+   "blocked": "no timeout faults to shorten",
+   "cases": 10,
+   "eligible": 7,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 47,
+   "requests_sha256": "25fa20bba373518927f9cad3cd1a1b60a83516790b0b0d50c78b4386d9f4b43b"
+  },
+  "pageorder": {
+   "blocked": "no timeout faults to shorten",
+   "cases": 33,
+   "eligible": 14,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 637,
+   "requests_sha256": "9de2ffa3c9c15ec66766075727073afbec2365390aff4a8a63aa122f7ce3dd31"
+  },
+  "pause": {
+   "blocked": "no timeout faults to shorten",
+   "cases": 7,
+   "eligible": 1,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 1357,
+   "requests_sha256": "6d1713fe2a45b82b872818c6237a4ce0694e5f57314031fdb87948ad4c46d2e9"
+  },
+  "pcwrite": {
+   "blocked": "no timeout faults to shorten",
+   "cases": 3,
+   "eligible": 3,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 5,
+   "requests_sha256": "5801a789e2c1515826d98de2b9138f7740e52b6b655417dcd42f316e4e7b3e95"
+  },
+  "pending": {
+   "cases": 25,
+   "eligible": 25,
+   "eligible_fault_us": 379776,
+   "eligible_timeout_faults": 3,
+   "max_event_us": 4,
+   "requests_sha256": "6a5deb9d50088671b7b68ac33f780b0d262c0e0273c15dacf3a66ad0119a6884"
+  },
+  "pram": {
+   "blocked": "no timeout faults to shorten",
+   "cases": 1,
+   "eligible": 1,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 6,
+   "requests_sha256": "c97469a190eecc0e398bbb8246d8c1b2543793e7035cf0801f9c05987d477dc0"
+  },
+  "progtime": {
+   "blocked": "no eligible case with evidence",
+   "cases": 387,
+   "eligible": 0,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 0,
+   "requests_sha256": "12fd1f9c7cbddc8752cffa5a6da7eff7309655fff81c2de950960173ce4329c2"
+  },
+  "r8": {
+   "blocked": "no timeout faults to shorten",
+   "cases": 11,
+   "eligible": 11,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 5,
+   "requests_sha256": "cf8ffdcc966127770572926b12a524fd13d2060ad9b053223f3a8c8720dbd457"
+  },
+  "rawpage": {
+   "blocked": "no timeout faults to shorten",
+   "cases": 2,
+   "eligible": 2,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 625,
+   "requests_sha256": "9acccedc324f56a573c34cd800d7c07a33cfdf42727c9a2d6b1643e113d1614e"
+  },
+  "rawwrite": {
+   "blocked": "no timeout faults to shorten",
+   "cases": 8,
+   "eligible": 5,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 645,
+   "requests_sha256": "4f6c329e9bf90605312dcf5aaf27ae7d1800e15d7ecd95204cb79baeeae5610b"
+  },
+  "readev": {
+   "cases": 128,
+   "eligible": 128,
+   "eligible_fault_us": 14937758,
+   "eligible_timeout_faults": 118,
+   "max_event_us": 120,
+   "requests_sha256": "8d4cb1afcbab3bc4b2cede3c0090bedbbd232443b3fe7dc6e84596ef7edcc0cc"
+  },
+  "readid": {
+   "blocked": "no timeout faults to shorten",
+   "cases": 4,
+   "eligible": 4,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 6,
+   "requests_sha256": "fd4cc3adf0767d019f2c60e9ebd7c3a045592296a55cb4650ac20191da9d391b"
+  },
+  "regmap": {
+   "blocked": "no timeout faults to shorten",
+   "cases": 1,
+   "eligible": 1,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 4,
+   "requests_sha256": "e1d7e1bdd012fb281b7245569cfb269a2bd398ec8e91405be28f4c02be414f62"
+  },
+  "regnum": {
+   "blocked": "no timeout faults to shorten",
+   "cases": 19,
+   "eligible": 19,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 4,
+   "requests_sha256": "4d00dd6e298493f0c8efeed8608ce50f8bad20a3b47d29c3f3e219b8926f8430"
+  },
+  "regsweep": {
+   "blocked": "no timeout faults to shorten",
+   "cases": 744,
+   "eligible": 248,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 13,
+   "requests_sha256": "9d8c488306cd6be1033c194cafcbfd77fb28ddc04d0d872119a99e8c86044a2b"
+  },
+  "restore": {
+   "blocked": "no timeout faults to shorten",
+   "cases": 2,
+   "eligible": 2,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 5,
+   "requests_sha256": "83423774f470cf46d990c9d45528c15db28e7da9700f608e3a13530179e2ff89"
+  },
+  "resume": {
+   "blocked": "no timeout faults to shorten",
+   "cases": 7,
+   "eligible": 7,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 5,
+   "requests_sha256": "b32958ad57adb2f3e8eba6ecdf5a663ad0d6962674855d5d95a92f0354e791d4"
+  },
+  "rschip": {
+   "blocked": "no timeout faults to shorten",
+   "cases": 14,
+   "eligible": 14,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 14,
+   "requests_sha256": "97c859fc93c74cdfc2b75897d78782492c6a2de448c36f5afb14269545e2ac7c"
+  },
+  "rsdecode": {
+   "blocked": "no timeout faults to shorten",
+   "cases": 14,
+   "eligible": 14,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 14,
+   "requests_sha256": "97c859fc93c74cdfc2b75897d78782492c6a2de448c36f5afb14269545e2ac7c"
+  },
+  "rsresult": {
+   "blocked": "no timeout faults to shorten",
+   "cases": 14,
+   "eligible": 14,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 14,
+   "requests_sha256": "97c859fc93c74cdfc2b75897d78782492c6a2de448c36f5afb14269545e2ac7c"
+  },
+  "rwmask": {
+   "blocked": "no timeout faults to shorten",
+   "cases": 699,
+   "eligible": 699,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 21,
+   "requests_sha256": "1394f23ee073acce323657d6982e7d3bb67268dd35e66bf062e2b74893e0b1c2"
+  },
+  "seqfirst": {
+   "blocked": "no timeout faults to shorten",
+   "cases": 1,
+   "eligible": 1,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 14,
+   "requests_sha256": "e063b128d98eb0419ea37559d49e417dab0ed7ac592ddd8ec1757ed716dc5ebb"
+  },
+  "seqrestart": {
+   "blocked": "no timeout faults to shorten",
+   "cases": 12,
+   "eligible": 12,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 14,
+   "requests_sha256": "6fc9cd5e3d40c8cc664863d99740a2675621344879d355a3d012983c96deb185"
+  },
+  "startbits": {
+   "blocked": "no eligible case with evidence",
+   "cases": 420,
+   "eligible": 0,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 0,
+   "requests_sha256": "a8efc5e01550b5c3bc7ec9b87bcebed3ae36e233efd0fbbd2af25846ff4af523"
+  },
+  "startdiff": {
+   "blocked": "no eligible case with evidence",
+   "cases": 24,
+   "eligible": 0,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 0,
+   "requests_sha256": "681161b954c8e278f41620ac286df1ea5ee16abd713b8389cea1f2a8b6a202e1"
+  },
+  "startregion": {
+   "blocked": "no eligible case with evidence",
+   "cases": 56,
+   "eligible": 0,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 0,
+   "requests_sha256": "a94c35870881131054f852ce328c0985c5b7ca3a3b68b9143fa9063fa6b160b6"
+  },
+  "startseq": {
+   "blocked": "no timeout faults to shorten",
+   "cases": 14,
+   "eligible": 14,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 4,
+   "requests_sha256": "9774638dd372dd1837cd96cfec5e15015f8b8917bd5c519dc8d4b2918c947fe5"
+  },
+  "startseq2": {
+   "blocked": "no timeout faults to shorten",
+   "cases": 18,
+   "eligible": 18,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 5,
+   "requests_sha256": "5be913b5e2e7f82eee26a3629af194359855daeca872c148fba83f67065fe39c"
+  },
+  "startseq3": {
+   "blocked": "no timeout faults to shorten",
+   "cases": 16,
+   "eligible": 12,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 4,
+   "requests_sha256": "51cc777a67d6339a56d966780ead09f264142bf630b1e37c809ec6ba38bc1772"
+  },
+  "state": {
+   "blocked": "no timeout faults to shorten",
+   "cases": 1,
+   "eligible": 1,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 5,
+   "requests_sha256": "681887854a0bc94f8f6e73e6b6d1f71ccb5f4a4cbf46b68d39c873efe35d8f6c"
+  },
+  "stprev": {
+   "blocked": "no timeout faults to shorten",
+   "cases": 39,
+   "eligible": 36,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 5,
+   "requests_sha256": "992f18765c43e13239949b7e922284e3a17a2781fc0657f9b391f9809758e856"
+  },
+  "straps": {
+   "blocked": "no timeout faults to shorten",
+   "cases": 1,
+   "eligible": 1,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 15,
+   "requests_sha256": "576d050cbde0ff64f0ad4e4e5a4a58d7b015fc959f467493f4611dd4b434ff2b"
+  },
+  "timeregs": {
+   "cases": 15,
+   "eligible": 15,
+   "eligible_fault_us": 1898876,
+   "eligible_timeout_faults": 15,
+   "max_event_us": 0,
+   "requests_sha256": "83cb8a6b61e87d5ce12d76cd46206aa8afe24ebfc2de5ad57f900ea6bb039661"
+  },
+  "tmobits": {
+   "blocked": "no eligible case with evidence",
+   "cases": 15,
+   "eligible": 0,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 0,
+   "requests_sha256": "c4374239276871bb5e059158ca6d3d0c3750757edf75ce1010a3e28dc15910a8"
+  },
+  "tmobits2": {
+   "blocked": "no eligible case with evidence",
+   "cases": 5,
+   "eligible": 0,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 0,
+   "requests_sha256": "fb7fd84b9028f887d73c326d430f191e75c02879dbd64a14157662468537404a"
+  },
+  "tmofield": {
+   "blocked": "no eligible case with evidence",
+   "cases": 12,
+   "eligible": 0,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 0,
+   "requests_sha256": "81400eabceda0093b0151080a77af616ee6310cd790d64a5859beab0e43bee4b"
+  },
+  "tmwait2": {
+   "cases": 7,
+   "eligible": 2,
+   "eligible_fault_us": 126592,
+   "eligible_timeout_faults": 1,
+   "max_event_us": 3,
+   "requests_sha256": "aa862ad6c64181fbfd8e04c21a057d25e8d74bff602bd2da5ed7fd249b7d321c"
+  },
+  "unknown": {
+   "cases": 36,
+   "eligible": 8,
+   "eligible_fault_us": 253184,
+   "eligible_timeout_faults": 2,
+   "max_event_us": 4,
+   "requests_sha256": "993bbb55f3b505b2b3b12795272d1d7d8735594005053585234debe719b6689d"
+  },
+  "vic20": {
+   "blocked": "no timeout faults to shorten",
+   "cases": 144,
+   "eligible": 144,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 9,
+   "requests_sha256": "93a8f285ebb4385f98e533192628d088955e16bad2cfc2a0b16017432f9b0eee"
+  },
+  "w2state": {
+   "cases": 1792,
+   "eligible": 1771,
+   "eligible_fault_us": 223307286,
+   "eligible_timeout_faults": 1764,
+   "max_event_us": 7,
+   "requests_sha256": "3f250e2362a1ea14c029cf692a041be4d8eecc9c30221678560c9f62f2c648aa"
+  },
+  "w2vic": {
+   "cases": 1024,
+   "eligible": 1012,
+   "eligible_fault_us": 127604296,
+   "eligible_timeout_faults": 1008,
+   "max_event_us": 8,
+   "requests_sha256": "77b62322aa02fd748523577970bbb4cf56d2de5faf477ca310c924c62cfd92fb"
+  },
+  "wait": {
+   "cases": 16,
+   "eligible": 16,
+   "eligible_fault_us": 1898876,
+   "eligible_timeout_faults": 15,
+   "max_event_us": 4,
+   "requests_sha256": "4d343e7aec819314df695e8d3f1ad14855beae9f54801cebd51531630abdcc1b"
+  },
+  "waitf": {
+   "cases": 10,
+   "eligible": 10,
+   "eligible_fault_us": 1012732,
+   "eligible_timeout_faults": 8,
+   "max_event_us": 4,
+   "requests_sha256": "9aa3f14c138b5e44636b7d94f1e640cdbe564a263d8486f3c76d481b0572b96a"
+  },
+  "writeseq": {
+   "blocked": "no timeout faults to shorten",
+   "cases": 11,
+   "eligible": 6,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 626,
+   "requests_sha256": "c80a0898207e2b7cd40048e603d7acb9bef71e5ce47c3d8b92bb7ca230225994"
+  },
+  "writeseq2": {
+   "blocked": "no timeout faults to shorten",
+   "cases": 12,
+   "eligible": 9,
+   "eligible_fault_us": 0,
+   "eligible_timeout_faults": 0,
+   "max_event_us": 645,
+   "requests_sha256": "846b70c2931ca8e1224cfee87a7a2811e771ddc29ff9dab75bc9698fdb2324e6"
+  }
+ },
+ "hardware_fault_us": 126450,
+ "late_wait2": [
+  8,
+  16,
+  19
+ ],
+ "source": "m2-all-p16.json sha256 56c8e1c81c4deee4994ed28b0e97412818ea8e802f64085b0f22a191e81e7534",
+ "step_us": 493.9453125
+}

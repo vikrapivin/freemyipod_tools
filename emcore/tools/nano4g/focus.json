@@ -1,0 +1,8 @@
+{
+ "generated_utc": "2026-11-07T07:03:07+00:00",
+ "registry_sha256": "42064fa723e4336305255449a4f94a9b87dc10aa66a97fa7919544aef5fa8e17",
+ "families": {
+  "m2_r6_gate_checkpoint": "incomplete capture: m2-p53.json.gz",
+  "m2_driver_profile": "never captured"
+ }
+}
