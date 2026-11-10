@@ -36,7 +36,13 @@ Logical sectors are 4096 bytes, the same size the nano 5G reader uses. Open the
 volume, then read or dump it. Mount does not program or erase.
 
 ```
-python3 tools/n4g.py ftl-open
-python3 tools/n4g.py lread 0 1 -o /tmp/sector0.bin
-python3 tools/n4g.py dump -o /tmp/disk.bin
+python3 tools/n4g.py ftl-open --backend fmss
+python3 tools/n4g.py dump --backend fmss -o /tmp/disk-fmss.bin
+python3 tools/n4g.py ftl-open --backend cpu
+python3 tools/n4g.py dump --backend cpu -o /tmp/disk-cpu.bin
 ```
+
+`--backend` selects the physical driver under the same FTL. `fmss` runs the
+sequencer programs. `cpu` runs the CPU driver. Changing it closes the mount,
+so open the volume again before `lread` or `dump`. Each line prints the
+device time in microseconds.

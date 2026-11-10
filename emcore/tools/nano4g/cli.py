@@ -43,6 +43,8 @@ def parser():
     page.add_argument("bank", type=int)
     page.add_argument("row", type=lambda x: int(x, 0))
     page.add_argument("-o", "--output", required=True)
+    page.add_argument("--backend", choices=("fmss", "cpu"),
+                      help="physical reader. FMSS is the default. Changing it closes the FTL.")
     fmss = sub.add_parser("fmss")
     commands = fmss.add_subparsers(dest="action", required=True)
     ex = commands.add_parser("explore")
@@ -128,18 +130,27 @@ def parser():
     fn.add_argument("--page", type=lambda x: int(x, 0), default=0)
     fn.add_argument("--in", dest="input", help="write: 4096 data bytes; a shorter file is padded with 0xff")
     fn.add_argument("--meta", help="write: 10 metadata bytes as hex (default ff x 10)")
-    sub.add_parser("ftl-open", help="mount the volume (step 5); does not program or erase")
+    fn.add_argument("--backend", choices=("fmss", "cpu"),
+                    help="FMSS uses program.s/erase.s. CPU uses the CPU driver. Changing it closes the FTL.")
+    fo = sub.add_parser("ftl-open", help="mount the volume (step 5); does not program or erase")
+    fo.add_argument("--backend", choices=("fmss", "cpu"),
+                    help="read the volume with this physical driver. Changing it closes an open FTL.")
     lr = sub.add_parser("lread", help="read 4096-byte logical sectors")
     lr.add_argument("sector", type=lambda x: int(x, 0))
     lr.add_argument("count", type=lambda x: int(x, 0), nargs="?", default=1)
     lr.add_argument("-o", "--output")
+    lr.add_argument("--backend", choices=("fmss", "cpu"),
+                    help="physical reader for this transfer. The volume must already be open on this backend.")
     du = sub.add_parser("dump", help="write the logical disk to a file, 4096 bytes per sector")
     du.add_argument("-o", "--output", required=True)
     du.add_argument("--start", type=lambda x: int(x, 0), default=0)
     du.add_argument("--count", type=lambda x: int(x, 0))
     du.add_argument("--chunk", type=lambda x: int(x, 0), default=32)
-    for command in (sub.choices['status'], step, page, ex, run, cn, suite, fn, lr, du,
-                    sub.choices['ftl-open']):
+    du.add_argument("--backend", choices=("fmss", "cpu"),
+                    help="physical reader. The volume must already be open on this backend.")
+    be = sub.add_parser("backend", help="show or set the physical backend used by the FTL and page commands")
+    be.add_argument("mode", nargs="?", choices=("fmss", "cpu"))
+    for command in (sub.choices['status'], step, page, ex, run, cn, suite, fn, fo, lr, du, be):
         command.add_argument('--usb', choices=('auto', 'bulk', 'control'), default='auto',
                              help='bulk on updated kernels; control is the slow diagnostic path')
     return ap
@@ -260,16 +271,43 @@ def _lib_rc(st):
     return st.job_lib_rc - (1 << 32) if st.job_lib_rc & 0x80000000 else st.job_lib_rc
 
 
-def ftl_open_command(s):
-    """Mount the VFL/FTL. Reads the volume; does not program or erase."""
+def device_us(st):
+    return (st.job_t_end - st.job_t_start) & 0xffffffff
+
+
+_BACKENDS = {0: 'fmss', 1: 'cpu'}
+
+
+def select_backend(s, name):
+    """Set the physical backend. Returns (name, closed). closed means the FTL mount was dropped."""
+    if name is None:
+        current, _, _ = s.cmd(Cmd.NAND_BACKEND, 2)
+        if current not in _BACKENDS:
+            raise ToolError('this image has no backend switch; reload the rebuilt image')
+        return _BACKENDS[current], False
+    which = 0 if name == 'fmss' else 1
+    current, closed, _ = s.cmd(Cmd.NAND_BACKEND, which)
+    if closed == 2:
+        raise ToolError('a NAND job is running')
+    if current != which:
+        raise ToolError('backend did not change (this image may need a reload)')
+    if closed:
+        print('FTL closed: the backend is now %s. Run ftl-open --backend %s before a logical read.' % (name, name),
+              flush=True)
+    return name, bool(closed)
+
+
+def ftl_open_command(s, a):
+    """Mount the VFL/FTL with the selected physical reader. Does not program or erase."""
     from .nand import stack_prepare
+    name, _ = select_backend(s, a.backend)
     stack_prepare(s)
-    print('PLAN: FTL open', flush=True)
+    print('PLAN: FTL open via %s' % name, flush=True)
     st = s.job(Cmd.NAND_STEP, 5, 0, timeout=300)
     if st.job_result:
         raise ToolError('FTL open failed: result %d, lib rc %d' % (st.job_result, _lib_rc(st)))
     st = s.status()
-    print('FTL open: %d sectors of %d bytes' % (st.ftl_pages, st.ftl_bpp))
+    print('FTL open via %s: %d sectors of %d bytes, %d us' % (name, st.ftl_pages, st.ftl_bpp, device_us(st)))
     return 0
 
 
@@ -292,19 +330,29 @@ def ftl_read_sectors(s, sector, count):
 
 
 def lread_command(s, a):
+    name, closed = select_backend(s, a.backend)
+    if closed:
+        raise ToolError('the FTL was closed by the backend change')
+    t0 = time.time()
     data = ftl_read_sectors(s, a.sector, a.count)
+    # The device time is on the last job. One lread is one job, so read it back from status.
+    st = s.status()
     if a.output:
         Path(a.output).write_bytes(data)
-        print('wrote %s (%d x 4096 bytes)' % (a.output, a.count))
+        print('wrote %s (%d x 4096 bytes) via %s, device %d us, host %.3f s' % (
+            a.output, a.count, name, device_us(st), time.time() - t0))
     else:
-        print(data[:256].hex())
+        print('%s via %s, device %d us, host %.3f s' % (data[:64].hex(), name, device_us(st), time.time() - t0))
     return 0
 
 
 def dump_command(s, a):
+    name, closed = select_backend(s, a.backend)
+    if closed:
+        raise ToolError('the FTL was closed by the backend change')
     st = s.status()
     if not st.step_ok_mask & (1 << 5):
-        raise ToolError('FTL not open: run ftl-open first')
+        raise ToolError('FTL not open: run ftl-open --backend %s' % name)
     total = st.ftl_pages
     start = a.start
     count = total - start if a.count is None else a.count
@@ -314,22 +362,25 @@ def dump_command(s, a):
     if chunk < 1 or chunk > 64:
         raise ToolError('--chunk must be 1..64')
     done = 0
+    device = 0
     t0 = time.time()
     with open(a.output, 'wb') as f:
         while done < count:
             n = min(chunk, count - done)
             f.write(ftl_read_sectors(s, start + done, n))
+            device += device_us(s.status())
             done += n
-            print('  %d/%d sectors' % (done, count), file=sys.stderr)
-    print('wrote %s: sectors %d..%d (%d bytes, %.1f s)' % (
-        a.output, start, start + count - 1, count * 4096, time.time() - t0))
+            print('  %d/%d sectors via %s' % (done, count, name), file=sys.stderr)
+    print('wrote %s: sectors %d..%d (%d bytes) via %s, device %d us, host %.1f s' % (
+        a.output, start, start + count - 1, count * 4096, name, device, time.time() - t0))
     return 0
 
 
 def fmss_nand_command(s, a):
-    """n4g.py fmss-nand write|erase: one page through program.s, or one block through erase.s."""
+    """n4g.py fmss-nand write|erase: one page or one block through the selected backend."""
     from .nand import stack_prepare
     from .protocol import MUTATE, Cmd
+    name, _ = select_backend(s, a.backend)
     if a.block is None:
         raise ToolError('--block is required')
     if not 0 <= a.ce < 8 or a.page < 0:
@@ -357,10 +408,11 @@ def fmss_nand_command(s, a):
         buf[0x1000:0x100a] = meta
         s.write_memory(st.result_addr, bytes(buf))
     op = 1 if a.action == 'erase' else 2
-    print('PLAN: FMSS %s CE%d block %d page %d row %d' % (a.action, a.ce, a.block, a.page, row), flush=True)
+    print('PLAN: %s %s CE%d block %d page %d row %d' % (name, a.action, a.ce, a.block, a.page, row), flush=True)
     st = s.job(Cmd.NAND_FMSS_NAND, op | (a.ce & 0xf) << 8, row, timeout=30)
     rc = st.job_lib_rc - (1 << 32) if st.job_lib_rc & 0x80000000 else st.job_lib_rc
-    print('FMSS %s CE%d block %d page %d row %d: rc %d' % (a.action, a.ce, a.block, a.page, row, rc))
+    print('%s %s CE%d block %d page %d row %d: rc %d, device %d us' % (
+        name, a.action, a.ce, a.block, a.page, row, rc, device_us(st)))
     if st.job_result == 2:
         raise ToolError('steps 1, 2 and 4 have not finished')
     if st.job_result == 3:
@@ -611,8 +663,12 @@ def main(argv=None):
             return cpu_nand_command(s, a)
         elif a.command == "fmss-nand":
             return fmss_nand_command(s, a)
+        elif a.command == "backend":
+            name, _ = select_backend(s, a.mode)
+            print(name)
+            return 0
         elif a.command == "ftl-open":
-            return ftl_open_command(s)
+            return ftl_open_command(s, a)
         elif a.command == "lread":
             return lread_command(s, a)
         elif a.command == "dump":
@@ -623,8 +679,10 @@ def main(argv=None):
         elif a.command == "read-page":
             if not 0 <= a.bank < 8 or a.row < 0:
                 raise ToolError("Invalid bank or row")
+            name, _ = select_backend(s, a.backend)
             st = check(s.job(Cmd.NAND_READ_PAGE, a.bank, a.row), (0, 1))
             Path(a.output).write_bytes(s.read(st.result_addr, st.result_len))
+            print('read-page via %s, device %d us, %d bytes' % (name, device_us(st), st.result_len))
         else:
             s.journal = journal
             timing = meta.setdefault('timing', {'clock': 'host time.monotonic seconds; device times are '

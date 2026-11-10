@@ -355,6 +355,7 @@ bool usbdebug_handle_data(const struct usb_instance* data, union usb_endpoint_nu
         case NPOC_CMD_CPU_NAND:
         case NPOC_CMD_NAND_COMPARE:
         case NPOC_CMD_FMSS_NAND:
+        case NPOC_CMD_NAND_BACKEND:
         {
             const void* rep = NULL;
             uint32_t replen = 0;

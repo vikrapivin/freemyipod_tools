@@ -24,6 +24,7 @@ class Cmd(IntEnum):
     NAND_FMSS_NAND = 144  # one page program or one block erase through program.s / erase.s
     NAND_FTL_OPEN = 124   # mount the VFL/FTL (step 5); does not program or erase
     NAND_FTL_READ = 125   # (sector, count) 4096-byte logical sectors
+    NAND_BACKEND = 145    # 0 FMSS, 1 CPU, 2 query. A change closes the FTL mount.
 
 
 MUTATE = 1 << 18       # selected experiment may program/erase NAND

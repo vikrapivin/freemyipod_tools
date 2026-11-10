@@ -41,6 +41,7 @@
 #define NPOC_JOB_CPU_NAND 20u
 #define NPOC_CMD_NAND_COMPARE 143u
 #define NPOC_JOB_NAND_COMPARE 21u
+#define NPOC_CMD_NAND_BACKEND 145u /* 0 FMSS, 1 CPU, 2 query. Changing it closes the FTL. */
 #define NPOC_CMD_FMSS_NAND 144u    /* program one page or erase one block with program.s / erase.s */
 #define NPOC_JOB_FMSS_NAND 22u
 #define NPOC_CMD_FTL_OPEN 124u     /* step 5: mount the VFL/FTL, no writes */

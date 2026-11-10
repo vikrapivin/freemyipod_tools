@@ -929,6 +929,12 @@ static _Bool ftl_restore(void)
 
 /* ==== Public API ==== */
 
+/* Drop the mount. The next ftl_init reads the volume again. */
+void ftl_close(void)
+{
+    ftl_mounted = false;
+}
+
 /* Mount once. Reserve 23 virtual blocks: three control and 20 log/free. */
 int ftl_init(void)
 {

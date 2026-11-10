@@ -23,6 +23,7 @@
 #include "nand/rockbox-compat.h"
 
 extern int ftl_init(void);
+extern void ftl_close(void);
 extern int ftl_read(uint32_t sector, uint32_t count, void *buffer);
 extern uint32_t ftl_num_sectors(void);
 
@@ -281,12 +282,12 @@ static int batch_run(uint32_t bytes, uint32_t crc, uint32_t first)
     return 0;
 }
 
-/* Host wrote 4096 data bytes and 12 metadata bytes (10 used) at g_result. Backend stays FMSS for this call. */
+/* Host wrote 4096 data bytes and 12 metadata bytes (10 used) at g_result.
+ * Program and erase use the selected backend (FMSS program.s/erase.s, or the CPU driver). */
 static int fmss_nand_job(const uint32_t *arg, uint32_t *result)
 {
     const struct nand_geometry *g = nand_get_geometry();
     uint32_t op = arg[0] & 0xff, ce = (arg[0] >> 8) & 0xf, row = arg[1];
-    unsigned int previous;
     int rc;
 
     *result = NPOC_R_OK;
@@ -299,15 +300,12 @@ static int fmss_nand_job(const uint32_t *arg, uint32_t *result)
         *result = NPOC_R_BAD_ARG;
         return 0;
     }
-    previous = nand_get_backend();
-    nand_set_backend(NAND_BACKEND_M2);
     if (op == FMSS_NAND_ERASE)
         rc = nand_erase_block(ce, row / g->pagesperblock);
     else {
         g_hal.cache_wb_inv(g_result, 0x1010);
         rc = nand_write_page(ce, row, g_result, (const uint32_t *)(g_result + 0x1000));
     }
-    nand_set_backend(previous);
     return rc;
 }
 
@@ -550,6 +548,23 @@ void nand_poc_usb_command(const uint32_t *buf, uint32_t *reply, const void **rep
     case NPOC_CMD_NAND_COMPARE: acc = queue(NPOC_JOB_NAND_COMPARE, buf[1], buf[2], buf[3]); break;
     case NPOC_CMD_CPU_NAND: acc = queue(NPOC_JOB_CPU_NAND, buf[1], buf[2], buf[3]); break;
     case NPOC_CMD_FMSS_NAND: acc = queue(NPOC_JOB_FMSS_NAND, buf[1], buf[2], buf[3]); break;
+    case NPOC_CMD_NAND_BACKEND:
+        if (buf[1] > 2) { reply[0] = 2; return; }
+        reply[1] = nand_get_backend();
+        reply[2] = 0;
+        if (buf[1] < 2) {
+            if (S.busy) { reply[2] = 2; return; }
+            if (nand_get_backend() != buf[1]) {
+                nand_set_backend(buf[1]);
+                ftl_close();
+                S.step_ok_mask &= ~(1u << NPOC_STEP_FTL);
+                S.ftl_pages = 0;
+                S.disk_mount_rc = 0xffffffffu;
+                reply[1] = buf[1];
+                reply[2] = 1;
+            }
+        }
+        return;
     case NPOC_CMD_WRITE_INFO:
         reply[1] = reply[2] = reply[3] = 0; /* no legacy FTL/write staging API */
         return;
