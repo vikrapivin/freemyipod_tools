@@ -42,6 +42,49 @@ def scratch_pattern(t):
     return bytes((i * 7 + (i >> 8)) & 0xff for i in range(t.scratch_bytes))
 
 
+def opsweep_cases(t, seeds, pat):
+    """Exact sweep inputs, independent of transport and earlier results."""
+    for op in range(256):
+        if op in t.known_ops:
+            continue
+        for label, reg, arg, imm in SWEEP_FORMS:
+            src = t.prologue(c58=0) + "".join("    movi r%d, #0x%08x\n" % (i, v) for i, v in sorted(seeds.items())) + \
+                "    movi r6, #0x0\n    .insn 0x%02x, %d, 0x%x, 0x%08x\n    movi r6, #0x600d600d\n    end\n" % (
+                    op, reg, arg, imm) + t.trap()
+            yield "%02x/%s" % (op, label), src, dict(params=SWEEP_PRAM, timeout_us=20000, scratch=pat, scratch_read=t.scratch_bytes)
+
+
+def opsweep_summary(out, t, seeds, pat):
+    lines, classes = [], {}
+    for key, rec in out.items():
+        op_text, label = key.split("/", 1)
+        op = int(op_text, 16)
+        if "case_error" in rec:
+            lines.append("  op %02x %s -> %s: %s" % (op, label, rec["case_error"], rec.get("message", "")))
+            continue
+        sc = rec.pop("scratch") or b""
+        rec["scratch_diff"] = [(i, pat[i], sc[i]) for i in range(len(sc)) if sc[i] != pat[i]][:64]
+        r6 = rec["r"][6]
+        how = "continued" if r6 == 0x600d600d else "vector" if r6 == 0xfa17fa17 else "stopped" if r6 == 0 else \
+            "r6=%08x" % r6
+        ms = "fast" if rec["elapsed_us"] < 1500 else "%.1f ms" % (rec["elapsed_us"] / 1000.0)
+        regs = " ".join("r%d=%08x" % (i, rec["r"][i]) for i in seeds if rec["r"][i] != seeds[i])
+        win = " ".join("0x%03x:%08x->%08x" % (o, a, b) for o, (a, b) in sorted(changes(rec).items())
+                       if o not in t.ctrl_skip | {0xc4c, 0xc58} and not 0xc18 <= o < 0xc38)   # the prologue sets those
+        mem = ("scratch %d bytes changed from +0x%x" % (len(rec["scratch_diff"]), rec["scratch_diff"][0][0])
+               if rec["scratch_diff"] else "")
+        cls = "%s %s %s CS_IRQ %02x%s%s%s" % (rec["why"], how, ms, rec["cs_irq"] & 0xff, " regs" if regs else "",
+                                               " window" if win else "", " memory" if mem else "")
+        classes.setdefault(cls, []).append("%02x" % op if label == SWEEP_FORMS[0][0] else None)
+        line = "  op %02x %-28s -> %s; %s" % (op, label, cls, "; ".join(x for x in (regs, win, mem) if x)
+                                                or "no other change")
+        lines.append(line)
+        print(line)
+        sys.stdout.flush()
+    summ = ["  %-50s %s" % (c, " ".join(o for o in ops if o)) for c, ops in sorted(classes.items())]
+    return out, "opcode classes (first operand form):\n" + "\n".join(summ) + "\nall runs:\n" + "\n".join(lines)
+
+
 @experiment("opsweep")
 def ex_opsweep(s, t):
     """Every opcode 0x00..0xff without a known meaning, in three operand forms: registers seeded with harmless

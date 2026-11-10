@@ -21,7 +21,7 @@
 A Target holds the assembler mode, the probe job's layout, the register windows, the recorded power-on values, the NAND
 set-up sequences (as methods: they emit FMSS source for the model's controller) and capability flags. The
 experiments in fmss/experiments are written against a Target; one that needs a capability the Target lacks is skipped.
-NANO3G is complete. NANO4G and NANO5G are skeletons: fields set to None are "to be measured / filled" and the
+NANO3G has device measurements; NANO4G has an experimental M2 transport. NANO5G is a skeleton: fields set to None are "to be measured / filled" and the
 helpers that need them raise NotImplementedError.
 """
 from dataclasses import dataclass, field
@@ -69,6 +69,10 @@ _3G_EVENTS = {"cmd": 0, "addr": 1, "dma": 2, "data": 3, "ecc": 4, "status": 5, "
 class Target:
     name: str
     asm_flags: tuple = ()                 # fmssasm mode flags: ("-3",) for the nano 3G, none for the 4G/5G names
+    validate_probe: object = None          # optional target-specific request guard
+    probe_flags: int = 0                  # explicit discovery capabilities of a bound experiment
+    irq_mask: int = 1 << 22
+    seq_enable: bool = False
     host: str = "nano3g"                  # package of the host transport library (session, nand job checks, Cmd)
     cmd_step: Optional[str] = None        # monitor command names (protocol.Cmd members) of the NAND step / probe jobs
     cmd_probe: Optional[str] = None
@@ -162,7 +166,7 @@ class Target:
     def prologue(self, c58=4):
         """C58 is written every time: it keeps its value across resets (device). 4 = a timeout vectors to the fault
         handler, as in the original programs"""
-        return "    wr   [CS_IRQ], #0xff\n    wr   [FMSS_C4C], #trap\n    wr   [FMSS_C58], #0x%x\n" % c58
+        return ("    wr   [FMSS_C10], #1\n" if self.seq_enable else "") + "    wr   [CS_IRQ], #0xff\n    wr   [FMSS_C4C], #trap\n    wr   [FMSS_C58], #0x%x\n" % c58
 
     def nand_prologue(self, ce=0):
         self.need("ce_sel", "fmc_init")
@@ -271,15 +275,19 @@ NANO3G = Target(
     has_start_value=True,
     has_nand_seq=True)
 
-# The 4G (S5L8720) and 5G (S5L8730) FMSS engines: same instruction encoding and assembler, no pld / pst, ECC_RESULT at
-# 0x80c; the FMC, ECC, sequencer and parameter RAM windows sit at +0x000, +0x800, +0xc00 and +0xd00 of the FMC base
-# (0x38a00000); the sequencer start word is 0xffb5 on the 4G. The device-side probe job does not exist there yet:
-# the layout, the power-on tables and the NAND sequences are to be measured / filled.
+# M2 transport; power-on masks and exploratory opcodes remain unmeasured.
 NANO4G = Target(
-    name="nano4g", asm_flags=(), windows=(0x000, 0x800, 0xc00, 0xd00),
-    nand_regs={0x000: "FMC_CTRL0", 0x008: "FMC_CMD"},
-    has_pld_pst=False, has_second_fmc_set=False, has_win400=False, has_sram_prog=False, has_start_value=False,
-    has_nand_seq=False)
+    name="nano4g", host="nano4g", cmd_step="NAND_STEP", cmd_probe="NAND_FMSS_PROBE", step_ok_bit=1,
+    probe_prog=0x400, probe_out=0x20000, probe_scratch=0x38000, scratch_bytes=0x8000,
+    req_magic=0x34525046, out_magic=0x3452504f, req_version=4, need_version=14, max_params=96, max_samples=1024,
+    head_fmt="<22I", head_bytes=88, sample_fmt="<10I", windows=(0x000, 0x800, 0xc00, 0xd00),
+    known_ops=frozenset(_3G_KNOWN_OPS - {0x18, 0x19}),
+    nand_regs={0x000: "FMC_CTRL0", 0x004: "FMCTRL1", 0x008: "FMC_CMD"},
+    clean_params=[(0xc58, 0), (0xc4c, 0)],
+    not_readback=frozenset({0xc0c, 0x048, 0x810}), ctrl_skip=frozenset(_3G_CTRL_SKIP),
+    has_start_value=True, has_sram_prog=True, has_fullmap=True,
+    # Unknown until measured: power-on defaults, second channel, pld/pst and IRQ routing.
+    irq_mask=0, seq_enable=True, has_nand_seq=False)
 
 NANO5G = Target(
     name="nano5g", asm_flags=(), windows=(0x000, 0x800, 0xc00, 0xd00),

@@ -46,6 +46,9 @@ WAIT_END = 1 << 14                                       # follow a fault that c
 PROG_SRAM = 1 << 15                                      # run a copy of the program from internal SRAM
 CH1_PINS = 1 << 16                                       # switch FMC channel 1's pins to the controller for the run
 FULLMAP = 1 << 17                                        # CPU dump of all 1024 window words before the start / after
+SAMPLER = 1 << 20                                        # nano4g: samples carry up to 8 host-chosen sources (r[k])
+GATEWIN, EIC, PADS = 1 << 21, 1 << 22, 1 << 23           # nano4g round-6 stimuli (nano4g/protocol.py)
+GATE_MARK = 0xfeed0000                                   # sample pc of the gate-window records
 WHY = {1: "END", 2: "FAULT", 3: "TIMEOUT"}
 
 _ASM = None
@@ -57,27 +60,54 @@ def set_experiment(name):
     _LOG_STATE["exp"] = name
 
 
+def build_dir():
+    from pathlib import Path
+    d = Path(__file__).resolve().parents[2] / "build" / "fmss-probes"
+    d.mkdir(parents=True, exist_ok=True)
+    return str(d)
+
+
 def assembler():
-    """Build emCORE's FMSS assembler (tools/fmssasm.c) once per process"""
+    """Build the assembler in the emCORE build tree, once per process."""
     global _ASM
     if _ASM is None:
         src = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "fmssasm.c")
-        d = tempfile.mkdtemp(prefix="fmssprobe_")
-        _ASM = os.path.join(d, "fmssasm")
-        subprocess.check_call(["cc", "-O2", "-o", _ASM, src])
+        dest = os.path.join(build_dir(), "fmssasm")
+        # A second campaign/test process may already be executing the assembler.
+        # Publish a complete executable atomically instead of truncating it.
+        with tempfile.TemporaryDirectory(prefix="compiler-", dir=build_dir()) as d:
+            binary = os.path.join(d, "fmssasm")
+            subprocess.check_call(["cc", "-O2", "-o", binary, src])
+            os.replace(binary, dest)
+        _ASM = dest
     return _ASM
 
 
+_ASM_CACHE = {}
+
+
 def assemble(t, text):
-    """FMSS source text -> program bytes, with the target's assembler mode and tokens"""
-    d = tempfile.mkdtemp(prefix="fmssprobe_")
-    src, out = os.path.join(d, "probe.s"), os.path.join(d, "probe.bin")
-    with open(src, "w") as f:
-        f.write(t.expand(text))
-    r = subprocess.run([assembler()] + list(t.asm_flags) + ["-b", out, src], capture_output=True, text=True)
-    if r.returncode:
-        raise ToolError("assembler: %s" % (r.stderr.strip() or r.stdout.strip()))
-    return open(out, "rb").read()
+    """Target source -> bytes; transient source stays inside the build tree.
+
+    Identical (flags, expanded source) pairs are assembled once per process:
+    resident planning, preparation and report replay otherwise spawn the
+    assembler several times for the same program (31k-case campaigns)."""
+    key = (tuple(t.asm_flags), t.expand(text))
+    if key not in _ASM_CACHE:
+        _ASM_CACHE[key] = _assemble(t, key[1])
+    return _ASM_CACHE[key]
+
+
+def _assemble(t, expanded):
+    with tempfile.TemporaryDirectory(prefix="asm-", dir=build_dir()) as d:
+        src, out = os.path.join(d, "probe.s"), os.path.join(d, "probe.bin")
+        with open(src, "w") as f:
+            f.write(expanded)
+        r = subprocess.run([assembler()] + list(t.asm_flags) + ["-b", out, src], capture_output=True, text=True)
+        if r.returncode:
+            raise ToolError("assembler: %s" % (r.stderr.strip() or r.stdout.strip()))
+        with open(out, "rb") as f:
+            return f.read()
 
 
 def lint(t, code, allow_nand=False, allow_indirect=False, allow_unknown=False):
@@ -126,7 +156,7 @@ def parse_out(t, head_and_windows, samples_raw):
     return {"why": WHY.get(h[2], h[2]), "elapsed_us": h[3], "cs_irq": h[4], "seq_result": h[5], "pc": h[6],
             "c50": h[7], "prog": h[8], "nsamples": h[9], "dropped": h[10], "polls": h[11],
             "pre_ok": h[12], "pre_us": h[13], "pre_cs_irq": h[14], "pre_c00": h[15], "late_at_us": h[16],
-            "fault_at_us": h[17] & ~1, "irq_seen": h[18] >> 22 & 1, "irq_end": h[19] >> 22 & 1, "late2_at_us": h[20],
+            "fault_at_us": h[17] & ~1, "irq_seen": (bool(h[18] & t.irq_mask) if t.irq_mask else None), "irq_end": (bool(h[19] & t.irq_mask) if t.irq_mask else None), "late2_at_us": h[20],
             "vic1_seen": h[18], "vic1_end": h[19], "vic0_seen": h[21],
             "r": [after[0xc18 + 4 * i] for i in range(8)], "before": before, "after": after,
             "samples": [{"t_us": s[0], "pc": s[1], "r": list(s[2:])} for s in samples]}
@@ -145,8 +175,11 @@ def probe(s, t, code, params=(), timeout_us=100000, flags=0, scratch=None, clean
     nw = len(t.windows)
     if steps & S_NO_CLEAN:                               # see what the previous run left: no CPU cleanup either
         clean = False
-    flags |= steps
+    flags |= steps | t.probe_flags
     params = (t.clean_params if clean else []) + list(params)
+    if t.validate_probe is not None:
+        t.validate_probe(code, params, timeout_us, flags, late, late_us, start_value, late2, late2_us,
+                         scratch, scratch_read)
     st = s.status()
     if not st.step_ok_mask & (1 << t.step_ok_bit):
         nand.check(s.job(getattr(Cmd, t.cmd_step), 1, 0))
@@ -159,17 +192,28 @@ def probe(s, t, code, params=(), timeout_us=100000, flags=0, scratch=None, clean
             f.write(json.dumps({"exp": _LOG_STATE["exp"], "i": _LOG_STATE["calls"],
                                 "sha": hashlib.sha256(blob).hexdigest(),
                                 "scratch": None if scratch is None else len(scratch)}) + "\n")
+    if hasattr(s, "plan_probe"):
+        s.plan_probe(_LOG_STATE["exp"], blob, scratch)
     s.write_memory(st.result_addr, blob)
     if scratch is not None:
         s.write_memory(st.result_addr + t.probe_scratch, scratch)
-    nand.check(s.job(getattr(Cmd, t.cmd_probe), len(blob), zlib.crc32(blob) & 0xffffffff, timeout=10.0))
+    job = s.job(getattr(Cmd, t.cmd_probe), len(blob), zlib.crc32(blob) & 0xffffffff, timeout=10.0)
+    # Discovery targets can retain a completed worker's capture even when its
+    # start/cleanup routine reports an error. Other targets retain strict checks.
+    worker = s.check_probe_job(job) if hasattr(s, "check_probe_job") else None
+    if not hasattr(s, "check_probe_job"):
+        nand.check(job)
     hw = s.read(st.result_addr + t.probe_out, t.head_bytes + 2 * nw * 256)
     nsamp = min(struct.unpack_from("<I", hw, 36)[0], t.max_samples)
     sraw = s.read(st.result_addr + t.probe_out + t.head_bytes + 2 * nw * 256, 40 * nsamp) if nsamp else b""
     rec = parse_out(t, hw, sraw)
+    if worker is not None:
+        rec["worker"] = worker
+        rec["execution"] = ("stall-safe" if rec.get("dropped") == 0x5afe5afe else
+                            "sampled" if rec["polls"] else "not-started")
     ver = struct.unpack_from("<I", hw, 4)[0]
     if ver < t.need_version:
-        raise ToolError("the running emCORE has probe version %d; this tool needs %d or later: run `n3g.py reload` "
+        raise ToolError("the running emCORE has probe version %d; this tool needs %d or later: load the matching target image "
                         "with the current build first" % (ver, t.need_version))
     rec["scratch"] = s.read(st.result_addr + t.probe_scratch, scratch_read) if scratch is not None else None
     if flags & FULLMAP:
@@ -182,6 +226,8 @@ def probe(s, t, code, params=(), timeout_us=100000, flags=0, scratch=None, clean
     if bad and not quiet:
         print("WARNING: CPU register writes did not read back before the start: %s" % ", ".join(
             "0x%03x wrote %08x read %08x" % (o, v, r) for o, (v, r) in sorted(bad.items())))
+    if hasattr(s, "record_probe"):
+        s.record_probe(rec)
     return rec
 
 
@@ -210,7 +256,8 @@ def describe(rec):
         for o in sorted(ch):
             L.append("  0x%03x: %08x -> %08x" % (o, ch[o][0], ch[o][1]))
     if rec["samples"]:
-        L.append("samples (t us, pc, r0..r7; without --sample-regs only the last column is set: CS_IRQ):")
+        L.append("samples (t us, pc, r0..r7; with the sampler r0..r7 are its sources; without --sample-regs or the "
+                 "sampler only the last column is set: CS_IRQ; pc %08x|n marks gate-window records):" % GATE_MARK)
         for smp in rec["samples"][:40]:
             L.append("  %6d  0x%04x  %s" % (smp["t_us"], smp["pc"], " ".join("%08x" % v for v in smp["r"])))
         if len(rec["samples"]) > 40:
@@ -313,6 +360,11 @@ def snapshot(s, t):
 def soft_reset(s, t):
     """the writes of `restore` without its snapshots: every writable FMC / ECC / sequencer word to its power-on value,
     status words acknowledged, the 0x100 block rewritten by the sequencer, parameter RAM zeroed"""
+    if t.name == "nano4g":
+        # The native job runs the M2 reset. Unknown power-on masks cannot be
+        # replaced by the M1 restore table.
+        probe(s, t, assemble(t, "    end\n"), timeout_us=20000, quiet=True)
+        return
     probe(s, t, assemble(t, "    end\n"), params=t.restore, timeout_us=20000, quiet=True, flags=F_WIN400)
     probe(s, t, assemble(t, t.prologue(c58=0) + t.restore_seq() + "    end\n" + t.trap()), params=t.restore_pram,
           timeout_us=20000, quiet=True)
