@@ -36,12 +36,15 @@
  * disassembly. Pinmux is left to gpio_preinit(); the Nano 3G PCON values
  * are a different board.
  *
- * Page reads and programs run the FMSS sequencer programs.
+ * Page policy and public APIs are shared by both physical backends. The
+ * default executes FMSS programs; the CPU backend drives the same controller
+ * and hardware ECC without a sequencer program (emCORE comparison harness).
  */
 
 #include "rockbox-compat.h"
 #include "nand-target.h"
 #include "nand-profile.h"
+#include "../cpu_nand_stack.h"
 
 #define NAND_CMD_READ           0x00
 #define NAND_CMD_READ2          0x30
@@ -421,12 +424,13 @@ int nand_read_raw(uint32_t bank, uint32_t page, void *buf, unsigned int len)
 
 static uint8_t nand_fmiss_page[NAND_PAGE_SIZE] CACHEALIGN_ATTR;
 static unsigned int nand_backend;
-
-void nand_set_cpu_optimized(bool enabled) { (void)enabled; }
+static bool nand_cpu_optimized = true;
+void nand_set_cpu_optimized(bool enabled) { nand_cpu_optimized = enabled; }
+static uint8_t nand_cpu_raw[CNAND_RAW_BUF] CACHEALIGN_ATTR;
 
 int nand_set_backend(unsigned int backend)
 {
-    if (backend != NAND_BACKEND_M2) return -1;
+    if (backend > NAND_BACKEND_CPU) return -1;
     nand_backend = backend;
     return 0;
 }
@@ -436,6 +440,11 @@ int nand_set_ecc_bits(unsigned int bits)
     if (bits != 8 && bits != 16) return -1;
     nand_ecclen = bits == 16 ? 26 : 13;
     return 0;
+}
+
+static void nand_cpu_init(struct cnand *n)
+{
+    cnand_init(n, NULL, 0, nand_get_ecc_bits());
 }
 
 
@@ -470,6 +479,16 @@ static int nand_fmiss_erase(uint32_t bank, uint32_t block)
     uint32_t r6;
     int rc;
 
+    if (nand_backend == NAND_BACKEND_CPU)
+    {
+        struct cnand n;
+        nand_cpu_init(&n);
+        n.optimized = nand_cpu_optimized;
+        unsigned int previous = nand_profile_enter(NAND_PROFILE_EXEC);
+        rc = cnand_erase_block(&n, bank, block);
+        nand_profile_leave(previous);
+        return rc ? rc : n.post_reset_rc ? CNAND_ERESET : 0;
+    }
     if (lcd_wait_write_dma())
         return -3;
     /* Prepare the engine before parameter writes; run must preserve them. */
@@ -506,6 +525,18 @@ static int nand_fmiss_program_page(uint32_t bank, uint32_t page, const void *dat
         memcpy(nand_fmiss_meta, meta, NAND_META_WORDS * 4);
     else
         memset(nand_fmiss_meta, 0xff, NAND_META_WORDS * 4);
+    if (nand_backend == NAND_BACKEND_CPU)
+    {
+        struct cnand n;
+        nand_cpu_init(&n);
+        n.optimized = nand_cpu_optimized;
+        unsigned int previous = nand_profile_enter(NAND_PROFILE_EXEC);
+        /* Each sector is encoded in a buffer and streamed. No raw image. */
+        rc = cnand_program_page(&n, bank, page, CNAND_FMT_MAIN, CNAND_ECC_HW,
+                                nand_fmiss_page, (const uint8_t *)nand_fmiss_meta, NULL);
+        nand_profile_leave(previous);
+        return rc ? rc : n.post_reset_rc ? CNAND_ERESET : 0;
+    }
     commit_dcache_range(nand_fmiss_page, sizeof(nand_fmiss_page));
     commit_dcache_range(nand_fmiss_meta, sizeof(nand_fmiss_meta));
 
@@ -665,10 +696,59 @@ static int nand_fmiss_read_span(struct nand_read *r, unsigned int n)
     return 0;
 }
 
+/* Sector report -> status bytes and the FMSS summary word. An erased page
+ * (every sector erased, or a blank page with fewer than three uncorrectable
+ * sectors) becomes 0xff data and metadata and a clean summary. */
+static void nand_cpu_publish(const struct cnand_report *rep, uint8_t *buf, uint32_t *summary)
+{
+    unsigned int i, blank = 0, bad = 0;
+    uint32_t r6 = 0;
+
+    memcpy(nand_rd.meta, rep->meta, sizeof(nand_rd.meta));
+    for (i = 0; i < NAND_CHUNKS_PER_PAGE; i++)
+    {
+        const struct cnand_sector *e = &rep->sector[i];
+        nand_rd.stat[i] = e->flags & CNAND_S_ERASED ? 0xfe :
+                         e->flags & CNAND_S_UNCORR ? 0xff : e->corrected;
+        if (e->flags & CNAND_S_UNCORR) r6 |= FMISS_R6_UECC;
+        else if (!(e->flags & CNAND_S_ERASED)) r6 |= 1u << e->corrected;
+    }
+    for (i = 0; i < NAND_CHUNKS_PER_PAGE; i++)
+    {
+        if (nand_rd.stat[i] == 0xfe)
+            blank++;
+        else if (nand_rd.stat[i] == 0xff)
+            bad++;
+    }
+    if (blank == NAND_CHUNKS_PER_PAGE
+        || (bad < 3 && blank + bad == NAND_CHUNKS_PER_PAGE))
+    {
+        memset(buf, 0xff, NAND_PAGE_SIZE);
+        memset(nand_rd.meta, 0xff, sizeof(nand_rd.meta));
+        r6 = 0;
+    }
+    *summary = r6;
+}
+
 static int nand_physical_read(uint32_t bank, uint32_t page, uint8_t *buf, uint32_t *summary)
 {
     uint32_t r6;
     int rc;
+    if (nand_backend == NAND_BACKEND_CPU)
+    {
+        struct cnand n;
+        struct cnand_report rep;
+        nand_cpu_init(&n);
+        n.read_ctrl0 = NAND_READ_TIMING | 0x01000801u;
+        n.optimized = nand_cpu_optimized;
+        unsigned int previous = nand_profile_enter(NAND_PROFILE_EXEC);
+        rc = cnand_read_page(&n, bank, page, CNAND_FMT_MAIN, CNAND_ECC_HW,
+                             CNAND_PATH_DMA, buf, nand_cpu_raw, &rep);
+        nand_profile_leave(previous);
+        if (rc || n.post_reset_rc) return rc ? rc : CNAND_ERESET;
+        nand_cpu_publish(&rep, buf, summary);
+        return 0;
+    }
     nand_rd.row = page;
     nand_rd.cemask = 1u << bank;
     nand_rd.dma[0] = (uint32_t)(intptr_t)buf;
@@ -782,6 +862,20 @@ int nand_read_boot_page(uint32_t bank, uint32_t page, void *databuf)
     if ((uintptr_t)buf & (CACHEALIGN_SIZE - 1))
         buf = nand_fmiss_page;
     uint32_t status[3];
+    if (nand_backend == NAND_BACKEND_CPU)
+    {
+        struct cnand n;
+        struct cnand_report rep;
+        nand_cpu_init(&n);
+        n.optimized = nand_cpu_optimized; /* bus timing stays the slow boot default */
+        rc = cnand_read_page(&n, bank, page, CNAND_FMT_BOOT, CNAND_ECC_HW,
+                             CNAND_PATH_DMA, buf, nand_cpu_raw, &rep);
+        if (rc || n.post_reset_rc) return rc ? rc : CNAND_ERESET;
+        for (c = 0; c < 3; c++)
+            status[c] = rep.sector[c].flags & CNAND_S_ERASED ? 0x40 :
+                        rep.sector[c].flags & CNAND_S_UNCORR ? 1 : 0;
+    }
+    else
     {
         discard_dcache_range(buf, FMISS_WRITE_BYTES);
         if (lcd_wait_write_dma())
@@ -835,6 +929,20 @@ static bool nand_write_allowed(uint32_t bank, uint32_t block)
 
 
 
+static int cpu_span_done(void *ctx, uint32_t index, const struct cnand_report *rep)
+{
+    struct nand_read *r = (struct nand_read *)ctx;
+    uint32_t summary;
+
+    nand_cpu_publish(rep, r[index].buf, &summary);
+    if (r[index].meta)
+        memcpy(r[index].meta, nand_rd.meta, sizeof(nand_rd.meta));
+    r[index].ecc = summary & FMISS_R6_UECC ? NAND_ECC_FAILED
+                 : summary & FMISS_R6_CORRECTED ? NAND_ECC_CORRECTED
+                 : NAND_ECC_CLEAN;
+    return 0;
+}
+
 int nand_read_pages(struct nand_read *r, unsigned int n)
 {
     unsigned int i;
@@ -844,6 +952,8 @@ int nand_read_pages(struct nand_read *r, unsigned int n)
     for (i = 0; i < n; i++)
         if (!r[i].buf || !nand_page_ok(r[i].bank, r[i].page))
             return -1;
+    if (nand_backend != NAND_BACKEND_CPU)
+    {
         for (i = 0; i < n; )
         {
             unsigned int cnt = 0, j;
@@ -876,6 +986,54 @@ int nand_read_pages(struct nand_read *r, unsigned int n)
             i += cnt;
         }
         return 0;
+    }
+    for (i = 0; i < n; )
+    {
+        struct cnand_main_page phys[CNAND_READ_SPAN];
+        struct cnand cn;
+        unsigned int cnt = 0, j;
+        int rc;
+
+        while (i + cnt < n && cnt < CNAND_READ_SPAN
+               && !((uintptr_t)r[i + cnt].buf & (CACHEALIGN_SIZE - 1)))
+        {
+            phys[cnt].ce = r[i + cnt].bank;
+            phys[cnt].row = r[i + cnt].page;
+            phys[cnt].data = r[i + cnt].buf;
+            phys[cnt].meta = r[i + cnt].meta;
+            cnt++;
+        }
+        if (!cnt)
+        {
+            int ecc = nand_read_page(r[i].bank, r[i].page, r[i].buf, r[i].meta);
+            if (ecc < 0)
+                return -1;
+            r[i].ecc = ecc;
+            i++;
+            continue;
+        }
+        nand_cpu_init(&cn);
+        cn.read_ctrl0 = NAND_READ_TIMING | 0x01000801u;
+        cn.optimized = nand_cpu_optimized;
+        {
+            unsigned int previous = nand_profile_enter(NAND_PROFILE_EXEC);
+            rc = cnand_read_main_pages(&cn, phys, cnt, cpu_span_done, r + i);
+            nand_profile_leave(previous);
+        }
+        if (rc || cn.post_reset_rc)
+            return -1;
+        for (j = 0; j < cnt; j++)
+            if (r[i + j].ecc == NAND_ECC_FAILED && nand_ecclen != 26)
+            {
+                int ecc = nand_read_page(r[i + j].bank, r[i + j].page,
+                                         r[i + j].buf, r[i + j].meta);
+                if (ecc < 0)
+                    return -1;
+                r[i + j].ecc = ecc;
+            }
+        i += cnt;
+    }
+    return 0;
 }
 
 int nand_erase_block(uint32_t bank, uint32_t block)
