@@ -45,5 +45,8 @@ void backlight_set_fade(uint8_t fade)
 
 void backlight_set_brightness(uint8_t brightness)
 {
+#ifdef N4G_LOWPOWER
+    if (brightness > 0x64) brightness = 0x64; /* stock clamp on a computer port: bl_DxeD1759:0xa54 */
+#endif
     i2c_sendbyte(0, 0xe6, 0x30, brightness & 0xff);
 }
