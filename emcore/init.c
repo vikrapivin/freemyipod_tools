@@ -22,6 +22,12 @@
 
 
 #include "global.h"
+#ifdef TARGET_ipodnano4g
+#include "target/ipodnano4g/boot_beacon.h"
+#define BEACON(id) boot_beacon((id), 0)
+#else
+#define BEACON(id) do {} while (0)
+#endif
 #include "thread.h"
 #include "timer.h"
 #ifdef HAVE_BUTTON
@@ -154,12 +160,14 @@ void storageinitthread(void* arg0, void* arg1, void* arg2, void* arg3)
                     shutdown(true);
                     power_off();
                 }
+    BEACON(BCN_STORAGE_ENTRY);
             }
             backlight_set_brightness(100);
         }
     }
     DEBUGF("Initializing storage drivers...");
     int rc = storage_init();
+    BEACON(BCN_STORAGE_INIT);
     if (IS_ERR(rc))
     {
         DEBUGF("Storage init error: %08X\n", rc);
@@ -169,6 +177,7 @@ void storageinitthread(void* arg0, void* arg1, void* arg2, void* arg3)
     disk_init_subsystem();
     DEBUGF("Mounting partitions...");
     rc = disk_mount_all();
+    BEACON(BCN_DISK_MOUNT);
     if (IS_ERR(rc))
     {
         DEBUGF("FS mount error: %08X\n", rc);
@@ -183,10 +192,13 @@ void initthread(void* arg0, void* arg1, void* arg2, void* arg3) INITCODE_ATTR;
 void initthread(void* arg0, void* arg1, void* arg2, void* arg3)
 {
     struct initbss* ib = (struct initbss*)arg0;
+    BEACON(BCN_INITTHREAD);
 #ifdef HAVE_I2C
     i2c_init();
+    BEACON(BCN_I2C);
 #endif
     power_init();
+    BEACON(BCN_POWER);
     cputs(CONSOLE_BOOT, welcomestring);
 #ifdef HAVE_STORAGE
     wakeup_init(&(ib->storagewakeup));
@@ -195,9 +207,11 @@ void initthread(void* arg0, void* arg1, void* arg2, void* arg3)
 #endif
 #ifdef HAVE_USB
     usbmanager_init();
+    BEACON(BCN_USB);
 #endif
 #ifdef HAVE_BACKLIGHT
     backlight_init();
+    BEACON(BCN_BACKLIGHT);
 #endif
 #ifdef HAVE_NAND5G
     { extern int n5g_nand_init(void); n5g_nand_init(); }
@@ -207,6 +221,7 @@ void initthread(void* arg0, void* arg1, void* arg2, void* arg3)
 #endif
 #ifdef HAVE_BUTTON
     button_init();
+    BEACON(BCN_BUTTON);
 #endif
 #ifdef HAVE_TARGETINIT_LATE
     targetinit_late();
@@ -302,19 +317,25 @@ void initthread(void* arg0, void* arg1, void* arg2, void* arg3)
 void init() INITCODE_ATTR;
 void init()
 {
+    BEACON(BCN_INIT_ENTRY);
 #ifdef HAVE_TARGETINIT_VERYEARLY
     targetinit_veryearly();
 #endif
     scheduler_init();
+    BEACON(BCN_SCHED);
     console_init();
+    BEACON(BCN_CONSOLE);
 #ifdef HAVE_LCD
     lcd_init();
+    BEACON(BCN_LCD);
     lcdconsole_init();
+    BEACON(BCN_LCDCONSOLE);
 #endif
 #ifdef HAVE_TARGETINIT_EARLY
     targetinit_early();
 #endif
     malloc_init();
+    BEACON(BCN_MALLOC);
     size_t size = (size_t)(&bootinfo) - (size_t)(&_poolstart) + bootinfo.totalsize;
     void* bootalloc = malloc(size);
     size -= (size_t)(bootalloc) - (size_t)(&_poolstart);
@@ -324,6 +345,9 @@ void init()
     reownalloc(bootalloc, OWNER_TYPE(OWNER_THREAD, &(ib->initthread)));
     thread_create(&(ib->initthread), initthreadname, initthread, ib->initstack,
                   sizeof(ib->initstack), OS_THREAD, 127, true, ib, NULL, NULL, NULL);
+    BEACON(BCN_INITTHREAD_MADE);
     timer_init();
+    BEACON(BCN_TIMER);
     interrupt_init();
+    BEACON(BCN_INTERRUPT);
 }
