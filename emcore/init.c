@@ -213,6 +213,9 @@ void initthread(void* arg0, void* arg1, void* arg2, void* arg3)
     backlight_init();
     BEACON(BCN_BACKLIGHT);
 #endif
+#if defined(TARGET_ipodnano4g) && !defined(NAND_POC_DISABLE)
+    { extern int nand_poc_init(void); nand_poc_init(); }
+#endif
 #ifdef HAVE_NAND5G
     { extern int n5g_nand_init(void); n5g_nand_init(); }
 #endif

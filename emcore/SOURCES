@@ -41,6 +41,10 @@ target/ipodnano4g/hwkeyaes.c
 target/ipodnano4g/nand_hal_emcore.c
 target/ipodnano4g/nand/nand-nano4g.c
 target/ipodnano4g/nand/fmss-controller.c
+target/ipodnano4g/nand_poc.c
+target/ipodnano4g/fmss_probe.c
+target/ipodnano4g/fmss_gate.S
+target/ipodnano4g/fmss_batch.c
 #endif
 usb/synopsysotg.c
 usb/synopsysotg_s5l87xx.c

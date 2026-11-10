@@ -27,6 +27,9 @@
 #include "target/ipodnano5g/nand5g.h"
 #include "target/ipodnano5g/module5g.h"
 #endif
+#if defined(TARGET_ipodnano4g) && !defined(NAND_POC_DISABLE)
+#include "target/ipodnano4g/nand_poc.h"
+#endif
 #ifdef HAVE_NAND3G
 #include "target/ipodnano3g/nand3g.h"
 #endif
@@ -325,6 +328,40 @@ bool usbdebug_handle_data(const struct usb_instance* data, union usb_endpoint_nu
         case N5G_NAND_WRITE_CAPS:
             n5g_nand_usb_command(buf, dbgbuf);
             break;
+#endif
+#if defined(TARGET_ipodnano4g) && !defined(NAND_POC_DISABLE)
+        case 120:  // nandlib PoC: {1, &nand_poc_status, size, result buffer}; others queue a job
+        case 121:
+        case 122:
+        case 123:
+        case 124:
+        case 125:
+        case 126:
+        case 127:
+        case 128:
+        case 129:
+        case 130:
+        case 131:
+        case 132:
+        case 133:
+        case 134:
+        case 135:
+        case 136:
+        case NPOC_CMD_FMSS_PROBE:
+        case NPOC_CMD_FMSS_INFO:
+        case NPOC_CMD_BATCH_ALLOC:
+        case NPOC_CMD_BATCH_RUN:
+        case NPOC_CMD_BATCH_FREE:
+        case NPOC_CMD_CPU_NAND:
+        case NPOC_CMD_NAND_COMPARE:
+        {
+            const void* rep = NULL;
+            uint32_t replen = 0;
+            nand_poc_usb_command(buf, dbgbuf, &rep, &replen);
+            dbgmemaddr = (void*)rep;
+            dbgmemlen = replen;
+            break;
+        }
 #endif
 #ifdef HAVE_NAND3G
         case N3G_NAND_STATUS:
@@ -957,6 +994,8 @@ void dbgthread(void* arg0, void* arg1, void* arg2, void* arg3)
                     buf[1] = dbg_monitor_heartbeat;
 #ifdef HAVE_NAND5G
                     n5g_nand_heartbeat(&buf[2], &buf[3]);
+#elif defined(TARGET_ipodnano4g) && !defined(NAND_POC_DISABLE)
+                    nand_poc_heartbeat(&buf[2], &buf[3]);
 #else
                     buf[2] = 0;
                     buf[3] = 0;
