@@ -191,6 +191,18 @@ execfirmware:
 	mcr	p15, 0, r0,c1,c0
 	mov	r0, #0
 	mcr	p15, 0, r0,c7,c5
+#ifdef TARGET_ipodnano4g
+	@ ARM1176 erratum 411920: discard old kernel instruction lines before
+	@ fetching the new image's entry branch (same workaround as crt0).
+	mcr	p15, 0, r0,c7,c5,0
+	mcr	p15, 0, r0,c7,c5,0
+	mcr	p15, 0, r0,c7,c5,0
+	.rept	11
+	nop
+	.endr
+	mcr	p15, 0, r0,c7,c5,6
+	mcr	p15, 0, r0,c7,c10,4
+#endif
 	bx	r1
 .size execfirmware, .-execfirmware
 
