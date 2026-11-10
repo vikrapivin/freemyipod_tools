@@ -15,6 +15,9 @@
 #include "nand_poc.h"
 #include "fmss_probe.h"
 #include "fmss_batch.h"
+#include "cpu_nand.h"
+#include "cpu_nand_stack.h"
+#include "nand_compare.h"
 #include "nand_hal_emcore.h"
 #include "nand/nand-target.h"
 #include "nand/rockbox-compat.h"
@@ -251,10 +254,14 @@ static int batch_run(uint32_t bytes, uint32_t crc, uint32_t first)
     b.output = g_batch_output; b.output_bytes = g_batch_output_cap;
     b.work = g_result; b.first = first; b.prepare = batch_prepare;
     S.progress_total = ((const struct fmss_batch_header *)g_batch_input)->count;
-    rc = fmss_batch_run(&g_hal, &b);
+    if (((const struct fmss_batch_header *)g_batch_input)->magic == CPU_NAND_BATCH_MAGIC) {
+        if (!need((1u << NPOC_STEP_GATES) | (1u << NPOC_STEP_PINS) | (1u << NPOC_STEP_FIL))) return -3;
+        rc = cpu_nand_batch_run(&b);
+    } else rc = fmss_batch_run(&g_hal, &b);
     if (rc) return rc;
     g_batch_next = o->next;
-    S.step_ok_mask &= ~(1u << NPOC_STEP_FIL);
+    if (((const struct fmss_batch_header *)g_batch_input)->magic != CPU_NAND_BATCH_MAGIC)
+        S.step_ok_mask &= ~(1u << NPOC_STEP_FIL);
     S.progress_done = o->next;
     S.job_detail[0] = o->next; S.job_detail[1] = o->bytes;
     S.job_detail[2] = (uint32_t)g_batch_output; S.job_detail[3] = o->errors;
@@ -276,6 +283,34 @@ static void run_job(uint32_t kind, const uint32_t *arg)
     else if (kind == NPOC_JOB_BATCH_RUN) rc = batch_run(arg[0], arg[1], arg[2]);
     else if (kind == NPOC_JOB_BATCH_FREE) batch_free();
     else if (kind == NPOC_JOB_STEP) rc = step(arg[0], arg[1]);
+    else if (kind == NPOC_JOB_NAND_COMPARE) {
+        uint32_t len = 0;
+        if (!need((1u << NPOC_STEP_GATES) | (1u << NPOC_STEP_PINS) | (1u << NPOC_STEP_FIL)))
+            result = NPOC_R_PRECOND;
+        else {
+            rc = nand_compare(g_result, NPOC_RESULT_BYTES, arg, &len);
+            if (rc == -31) result = NPOC_R_BAD_ARG;
+        }
+        S.result_len = len;
+    }
+    else if (kind == NPOC_JOB_CPU_NAND && (arg[0] & 0xff) >= CNS_OP_INFO) {
+        /* CPU-only NAND driver sub-ops (cpu_nand_stack.h); ops 0..5 below keep their ABI. */
+        uint32_t len, det[2] = { 0, 0 };
+        rc = cpu_nand_stack_job(g_result, arg, need((1u << NPOC_STEP_GATES) | (1u << NPOC_STEP_PINS) |
+                                                    (1u << NPOC_STEP_FIL)), &result, det, &len);
+        S.job_detail[0] = det[0]; S.job_detail[1] = det[1];
+        S.result_len = len;
+    }
+    else if (kind == NPOC_JOB_CPU_NAND) {
+        uint32_t len, det[2] = { 0, 0 };
+        if (!need((1u << NPOC_STEP_GATES) | (1u << NPOC_STEP_PINS)) ||
+            ((arg[0] & 0xff) && (arg[0] & 0xff) != 5 && !need(1u << NPOC_STEP_FIL))) result = NPOC_R_PRECOND;
+        else {
+            rc = cpu_nand_job(g_result, arg, &result, det, &len);
+            S.job_detail[0] = det[0]; S.job_detail[1] = det[1];
+            S.result_len = len;
+        }
+    }
     else if (!need(1u << NPOC_STEP_FIL)) result = NPOC_R_PRECOND;
     else if (kind == NPOC_JOB_READ_RESERVED) {
         const struct nand_geometry *g = nand_get_geometry();
@@ -407,7 +442,7 @@ void nand_poc_usb_command(const uint32_t *buf, uint32_t *reply, const void **rep
         reply[1] = 0x4d325052;
         reply[2] = 14;
         reply[3] = FMSS_PROBE_FULLMAP | FMSS_PROBE_DISCOVERY | FMSS_BATCH_CAP | (1u << 22) | (1u << 23) | (1u << 24) | (1u << 25) | (1u << 26) | (1u << 27) | FMSS_PROBE_VICSOFT; /* bulk, recovery, phases, progress, state-b reset, reset while held, VIC soft lines */
-        reply[3] |= FMSS_PROBE_STALL_SAFE;
+        reply[3] |= FMSS_PROBE_CPU_NAND | FMSS_PROBE_STALL_SAFE;                  /* CPU-direct NAND jobs (cpu_nand.c) */
         reply[3] |= FMSS_PROBE_CAP_SAMPLER | FMSS_PROBE_CAP_STIMULI;          /* round 6: CPU sampler; gate window, EIC, far pads */
         reply[3] |= FMSS_PROBE_MUTATE;                    /* writes allowed after DFU and after reload */
         if (n4g_reload_boot) reply[3] |= FMSS_PROBE_RELOADED;

@@ -48,6 +48,7 @@ target/ipodnano4g/fmss_batch.c
 target/ipodnano4g/cpu_nand_ll.c
 target/ipodnano4g/cpu_nand_stack.c
 target/ipodnano4g/bch_sw.c
+target/ipodnano4g/cpu_nand.c
 #endif
 usb/synopsysotg.c
 usb/synopsysotg_s5l87xx.c
