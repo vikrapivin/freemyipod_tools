@@ -41,6 +41,18 @@
 
 #include "../ipodnano4g/s5l8720.h"
 #define HAVE_USB
+/* Experimental monitor: NAND is accessed only through explicit worker jobs. */
+#define NAND_POC_NOSTORAGE
+/* NAND harness: drop FAT/file/dir, app loader, boot-from-file and libc extras */
+#ifdef N4G_SLIM   /* opt-in since round 9 (make EMCORE_SLIM=1): every SLIM image rebooted on the device, every pre-SLIM image booted */
+#define EMCORE_SLIM
+#endif
+/* defensive device init for the DFU/bootstub path (target/ipodnano4g/targetinit.c, A) */
+#ifdef N4G_TARGETINIT /* opt-in (make N4G_TARGETINIT=1): defensive init of; OFF by default since round 8 */
+#define HAVE_TARGETINIT_VERYEARLY
+#define HAVE_TARGETINIT_EARLY
+#define HAVE_TARGETINIT_LATE
+#endif
 #define USB_DRIVER_HEADER "usb/synopsysotg.h"
 #define USB_DRIVER synopsysotg_driver
 #define USB_DRIVER_CONFIG_TYPE const struct synopsysotg_config
@@ -79,13 +91,10 @@
 
 #define HAVE_HWKEYAES
 
-//#define HAVE_STORAGE
-//#define HAVE_FLASH_STORAGE
-//#define HAVE_STORAGE_FLUSH
-//#define CONFIG_STORAGE STORAGE_NAND
-//#define SECTOR_SIZE 4096
+/* Physical experiment monitor: no mounted storage/FTL. */
 
 #define HAVE_ACCELEROMETER
+
 
 
 #endif
