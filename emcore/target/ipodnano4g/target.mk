@@ -7,3 +7,6 @@ ifneq ($(N4G_LOWPOWER_CLKDROP),0)
 CFLAGS_ipodnano4g += -DN4G_LOWPOWER_CLKDROP
 endif
 endif
+
+TARGET_OUTPUT_ipodnano4g := build/ipodnano4g/emcore-nano4g.dfu build/ipodnano4g/emcore-nano4g.bin build/ipodnano4g/emcore-nano4g.nm build/ipodnano4g/emcore-nano4g.map
+include target/ipodnano4g/image.mk

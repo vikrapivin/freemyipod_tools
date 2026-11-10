@@ -101,6 +101,6 @@ build/version.h: version.h version-force
 	@cmp -s $@.tmp $@ && rm $@.tmp || mv $@.tmp $@
 
 clean:
-	@rm -rf build
+	@$(PYTHON) tools/clean.py
 
 .PHONY: all clean $(TARGETS)
