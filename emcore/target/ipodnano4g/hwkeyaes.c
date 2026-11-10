@@ -22,6 +22,8 @@
 
 
 #include "global.h"
+#include "clockgates.h"
+#include "mmu.h"
 #include "hwkeyaes.h"
 #include "s5l8720.h"
 #include "thread.h"

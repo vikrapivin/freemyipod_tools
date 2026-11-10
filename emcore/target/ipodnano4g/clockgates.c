@@ -22,6 +22,7 @@
 
 
 #include "global.h"
+#include "contextswitch.h"
 #include "s5l8720.h"
 
 
