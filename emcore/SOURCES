@@ -27,6 +27,7 @@ usb/synopsysotg_s5l87xx.c
 #ifdef TARGET_ipodnano4g
 target/ipodnano4g/mmu.c
 target/ipodnano4g/boot_beacon.c
+target/ipodnano4g/targetinit.c
 target/ipodnano4g/lcd.c
 target/ipodnano4g/timer.c
 target/ipodnano4g/i2c.c
