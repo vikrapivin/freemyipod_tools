@@ -22,9 +22,10 @@ python3 tools/n4g.py cpu-suite --one-page
 python3 tools/n4g.py cpu-suite
 ```
 
-`cpu-suite --one-page` finds one erased page on bank 1, above row 1024. The
-FMSS reader and the CPU driver both read it, the CPU driver programs a
-pattern, and both readers must return that pattern. The block is not erased.
+`cpu-suite --one-page` finds one logical page on bank 1 from the page spare
+(logical page 0 is skipped). The FMSS reader and the CPU driver both read
+it, the CPU driver programs a pattern, and both readers must return that
+pattern. That block is erased for the program and then restored.
 `cpu-suite` without that flag saves the whole block, programs a pattern, and
 restores the saved pages. The backup is written under `nand_device_suite/`.
 

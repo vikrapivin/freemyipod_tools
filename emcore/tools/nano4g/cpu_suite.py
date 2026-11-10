@@ -250,13 +250,27 @@ def _result(ok, phase, message, **fields):
     return out
 
 
-SCAN_PAGES = 128
+SCAN_PAGES = 256
+# Spare of a user page: logical page, update sequence, ECC mark, type.
+# 0x40 is a log page and 0x41 is a data page.
+LOGICAL_TYPES = (0x40, 0x41)
 
 
-def run_one_page(dev, rng):
-    """Read one erased page with both drivers, program it from the CPU, and read it back with both.
+def logical_lpn(meta):
+    """Logical page number stored in a 10-byte spare, or None."""
+    if len(meta) < META or meta[9] not in LOGICAL_TYPES:
+        return None
+    lpn = struct.unpack_from('<I', meta)[0]
+    if lpn == 0 or lpn == 0xffffffff:
+        return None
+    return lpn
 
-    The block is not erased. A page that already holds data is left alone.
+
+def run_one_page(dev, rng, backup_dir, now=None):
+    """Read one logical page with both drivers, program it from the CPU, and restore the block.
+
+    The page is the one whose spare names a logical page. Logical page 0 is skipped.
+    The block is erased for the program and then restored.
     """
     dev.prepare()
     geo = dev.geometry()
@@ -264,46 +278,42 @@ def run_one_page(dev, rng):
     span = geo.pages_per_block * geo.blocks
     start = choose_row(rng, geo.pages_per_block, geo.blocks)
     ce = BANK
-    print('cpu-suite: chip %08x, looking for one erased page from row %d' % (geo.chip_id, start), flush=True)
-    row = None
+    print('cpu-suite: chip %08x, looking for one logical page from row %d' % (geo.chip_id, start), flush=True)
+    found = None
     for step in range(SCAN_PAGES):
         candidate = start + step
         if candidate >= span:
             break
         fmss = dev.fmss_read(ce, candidate)
-        if fmss.kind != 'erased':
+        lpn = logical_lpn(fmss.meta)
+        if lpn is None:
             continue
         _check_live(dev, geo)
         cpu = dev.cpu_read(ce, candidate)
-        if not readers_agree(fmss, cpu):
-            block, page = divmod(candidate, geo.pages_per_block)
+        block, page = divmod(candidate, geo.pages_per_block)
+        if not readers_agree(fmss, cpu) or logical_lpn(cpu.meta) != lpn:
             return _result(False, 'agree',
-                           'FMSS and CPU reads of row %d differ. Nothing was programmed.' % candidate,
+                           'FMSS and CPU reads of logical page %d differ. Nothing was erased.' % lpn,
                            ce=ce, block=block, page=page, row=candidate, backup=None,
-                           chip_id=geo.chip_id, bch=BCH)
-        row = candidate
+                           chip_id=geo.chip_id, bch=BCH, lpn=lpn)
+        found = (candidate, fmss, lpn)
         break
-    if row is None:
+    if found is None:
         return _result(False, 'read',
-                       'No erased page in the %d rows from %d. Nothing was programmed.' % (SCAN_PAGES, start),
+                       'No logical page in the %d rows from %d. Nothing was erased.' % (SCAN_PAGES, start),
                        ce=ce, block=start // geo.pages_per_block, page=start % geo.pages_per_block,
                        row=start, backup=None, chip_id=geo.chip_id, bch=BCH)
+    row, fmss, lpn = found
     block, page = divmod(row, geo.pages_per_block)
-    print('cpu-suite: both readers see row %d erased' % row, flush=True)
-    print('PLAN: CPU program pattern at CE%d row %d' % (ce, row), flush=True)
-    dev.program(ce, row, PATTERN, PATTERN_META)
-    try:
-        _expect_pattern(dev.fmss_read(ce, row), row)
-        _expect_pattern(dev.cpu_read(ce, row), row)
-    except SuiteError as exc:
-        return _result(False, 'pattern', str(exc),
-                       ce=ce, block=block, page=page, row=row, backup=None,
-                       chip_id=geo.chip_id, bch=BCH)
-    return _result(True, 'page',
-                   'PASS CE%d block %d page %d row %d. Both readers returned the pattern. '
-                   'The block was not erased.' % (ce, block, page, row),
-                   ce=ce, block=block, page=page, row=row, backup=None,
-                   chip_id=geo.chip_id, bch=BCH)
+    print('cpu-suite: logical page %d at CE%d block %d page %d row %d' % (lpn, ce, block, page, row), flush=True)
+    print('cpu-suite: both readers agree. The block will be erased and then restored.', flush=True)
+    report = write_and_restore(dev, geo, ce, row, fmss, backup_dir, now)
+    report['lpn'] = lpn
+    if report['passed']:
+        report['message'] = ('PASS logical page %d at CE%d block %d page %d row %d. '
+                             'Both readers saw the pattern. The block matches the backup.' % (
+                                 lpn, ce, block, page, row))
+    return report
 
 
 def run_read(dev, rng):
@@ -346,6 +356,12 @@ def run_suite(dev, rng, backup_dir, now=None):
                        'FMSS and CPU reads of row %d differ. Nothing was erased.' % row,
                        ce=ce, block=block, page=page, row=row, backup=None)
     print('cpu-suite: FMSS and CPU agree on row %d (%s)' % (row, fmss.kind), flush=True)
+    return write_and_restore(dev, geo, ce, row, fmss, backup_dir, now)
+
+
+def write_and_restore(dev, geo, ce, row, fmss, backup_dir, now):
+    """Back up the block, program the pattern from the CPU, and restore."""
+    block, page = divmod(row, geo.pages_per_block)
     try:
         saved = _read_block(dev, geo, ce, block, fmss, row)
         _check_live(dev, geo)
@@ -532,7 +548,7 @@ def command(session, backup_dir=None, restore=None, rng=None, now=None, read_onl
             return 0
         rng = rng or random.SystemRandom()
         if one_page:
-            report = run_one_page(dev, rng)
+            report = run_one_page(dev, rng, directory, now)
         elif read_only:
             report = run_read(dev, rng)
         else:

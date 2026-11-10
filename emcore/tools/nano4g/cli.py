@@ -115,7 +115,7 @@ def parser():
     suite = sub.add_parser("cpu-suite",
                            help="on-device CPU NAND read/write test: bank 1, one page chosen at run time")
     suite.add_argument("--one-page", action="store_true",
-                       help="read one erased page with both drivers, program it from the CPU, and read it back; the block is not erased")
+                       help="use one logical page: both drivers read it, the CPU programs a pattern, both read it back, then the block is restored")
     suite.add_argument("--read-only", action="store_true",
                        help="compare one page with both readers and stop; no erase")
     suite.add_argument("--backup-dir", help="directory for the block backup (default: nand_device_suite/)")
