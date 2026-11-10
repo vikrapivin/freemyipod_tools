@@ -7,7 +7,8 @@ MEMORY
 {
     INIT : ORIGIN = 0x08000000, LENGTH = 0x01f80000
     SRAM : ORIGIN = 0x22000000, LENGTH = 0x00030000
-    SDRAM : ORIGIN = 0x09f80000, LENGTH = 0x00080000
+    SDRAM : ORIGIN = 0x09f80000, LENGTH = 0x00054000   /* .text/.rodata/.data/.bss, up to the LCD fb */
+    LCD  : ORIGIN = 0x09FD4000, LENGTH = 0x0002C000
 }
 
 SECTIONS
@@ -28,22 +29,26 @@ SECTIONS
         *(.intvect)
         *(.icode*)
         *(.irodata*)
+        _sram_code_end = .;
         *(.idata*)
         . = ALIGN(0x4);
         _sramend = .;
     } > SRAM AT> INIT
     _sramsource = LOADADDR(.sram);
 
+    /* 0x09000000 is stage 2. It is loaded into SDRAM and executed when
+       needed. It is not part of the DFU image. The heap stops here so a
+       later load is not allocator memory. */
+    _poolend = 0x09000000;
+
     .sdram :
     {
         _sdramstart = .;
-        _poolend = .;
         *(.text*)
-        *(.glue_7)
-        *(.glue_7t)
         . = ALIGN(0x4);
         *(.rodata*)
         . = ALIGN(0x4);
+        _sdram_code_end = .;
         *(.data*)
         . = ALIGN(0x4);
         _sdramend = .;
@@ -93,9 +98,28 @@ SECTIONS
         _bssend = .;
     } > SDRAM
 
+    .lcdfb (NOLOAD) :
+    {
+        _lcdfbstart = .;
+        *(.lcdfb*)
+        . = ALIGN(0x4);
+        _lcdfbend = .;
+    } > LCD
+
     /DISCARD/ :
     {
         *(.eh_frame)
     }
+
+    /* SRAM-BUDGET GUARD (2026-09-24 boot regression): the SELF-INIT bootstub
+       (bootstub.S block0_constpool R11) puts its first-level MMU page table at
+       0x2202C000 and that table remains the ACTIVE TTBR for the whole run (the
+       payload crt0 never rewrites CP15 c2).  .ibss (SRAM bss) MUST end below
+       0x2202C000 or crt0's clearibss zeroes live page-table entries and the
+       image faults back to DFU.  Fail the link loudly instead of silently. */
+    ASSERT(_ibssend <= 0x2202C000, ".ibss overflowed into the 0x2202C000 bootstub MMU page table (SRAM budget) — move a .ibss/.stack symbol to DRAM .bss")
+
+    /* framebuffer must fit its pinned region and stay clear of SDRAM end */
+    ASSERT(_lcdfbend <= 0x0A000000, ".lcdfb (LCD framebuffer) overflowed past the 0x0A000000 SDRAM end")
 
 }
