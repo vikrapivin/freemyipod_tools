@@ -41,48 +41,48 @@ __start:
 .section .initcode,"ax",%progbits
 .global _start
 _start:
+	@ One kernel entry for DFU and EXECFIRMWARE reload. The retained bootstub
+	@ enters with SCTLR.M=1; execfirmware clears M+C before its jump.
+	@ Preserve that distinction across relocation for the experiment capability.
+	mrc	p15, 0, r8,c1,c0
+	and	r8, r8, #1
+	eor	r8, r8, #1
+	cpsid	aif
+	ldr	r0, =0x38200110		@ DMAC0 C0CONFIG (PL080, +0x20 per channel)
+	ldr	r1, =0x38700110		@ DMAC1 C0CONFIG
+	mov	r2, #8
+.stage2_dma:
+	ldr	r3, [r0]
+	bic	r3, r3, #1		@ channel enable off (stage 1 gone, no transfer may continue)
+	str	r3, [r0], #0x20
+	ldr	r3, [r1]
+	bic	r3, r3, #1
+	str	r3, [r1], #0x20
+	subs	r2, r2, #1
+	bne	.stage2_dma
+	mov	r0, #0
+	mcr	p15, 0, r0,c7,c14,0	@ clean+invalidate D (all lines are clean already: execfirmware cleaned)
+	@ invalidate I: the previous kernel's lines for 0x09f8xxxx/0x2200xxxx/0x0800xxxx hold OTHER code at the addresses stage 2
+	@ uses. ARM1176 erratum 411920 (an entire-I-cache invalidate coincident with a linefill can miss lines):
+	@ 4 x c7,c5,0 + 11 NOPs as Linux arch/arm/mm/cache-v6.S (ARM_ERRATA_411920) does.
+	mcr	p15, 0, r0,c7,c5,0
+	mcr	p15, 0, r0,c7,c5,0
+	mcr	p15, 0, r0,c7,c5,0
+	mcr	p15, 0, r0,c7,c5,0
+	.rept	11
+	nop
+	.endr
+	mcr	p15, 0, r0,c7,c5,6	@ flush branch target cache
+	mcr	p15, 0, r0,c8,c7,0	@ invalidate unified TLB
+	mcr	p15, 0, r0,c7,c10,4	@ drain write buffer
+	mcr	p15, 0, r0,c7,c5,4	@ flush prefetch buffer
 	mrc	p15, 0, r0,c1,c0
 	bic	r0, r0, #0x200
 	orr	r0, r0, #0x100
 	mcr	p15, 0, r0,c1,c0
 	mov	r0, #0x7fffffff
 	mcr	p15, 0, r0,c3,c0
-	mov	r0, #0x22000000
-	orr	r1, r0, #0x00000100
-	orr	r0, r0, #0x0003c000
-	orr	r1, r1, #0x000000fe
-	add	r2, r0, #0x200
-	mov	r3, #0
-	str	r1, [r0], #4
-.mmuloop1:
-	str	r3, [r0], #4
-	cmp	r0, r2
-	bne	.mmuloop1
-	add	r0, r0, #0x080
-	add	r2, r0, #0x580
-.mmuloop2:
-	str	r3, [r0], #4
-	cmp	r0, r2
-	bne	.mmuloop2
-	add	r0, r0, #0x4
-	add	r2, r0, #0x7c
-.mmuloop3:
-	str	r3, [r0], #4
-	cmp	r0, r2
-	bne	.mmuloop3
-	add	r0, r0, #0x4
-	add	r2, r0, #0x500
-	add	r2, r2, #0x7c
-.mmuloop4:
-	str	r3, [r0], #4
-	cmp	r0, r2
-	bne	.mmuloop4
-	add	r0, r0, #0x200
-	add	r2, r0, #0x3000
-.mmuloop5:
-	str	r3, [r0], #4
-	cmp	r0, r2
-	bne	.mmuloop5
+	@ Keep the bootstub TTBR at 0x2202c000; do not write a second, unused table.
 	mrc	p15, 0, r0,c1,c0
 	orr	r0, r0, #5
 	orr	r0, r0, #0x400000
@@ -103,6 +103,7 @@ _start:
 	ldrhi	r3, [r0], #4
 	strhi	r3, [r1], #4
 	bhi	.copysdram
+	mov	r2, #0
 	ldr	r0, =_ibssstart
 	ldr	r1, =_ibssend
 	mov	r2, #0
@@ -116,10 +117,19 @@ _start:
 	cmp	r1, r0
 	strhi	r2, [r0], #4
 	bhi	.clearbss
+	ldr	r0, =n4g_reload_boot
+	str	r8, [r0]
 	mov	r0, #0
 	mcr	p15, 0, r0,c7,c10,0 @ clean data cache
 	mcr	p15, 0, r0,c7,c10,4 @ drain write buffer
 	mcr	p15, 0, r0,c7,c5,0  @ invalidate instruction cache
+	mcr	p15, 0, r0,c7,c5,0	@ erratum 411920 workaround (see the stage-2 prologue): .sram/.sdram now hold
+	mcr	p15, 0, r0,c7,c5,0	@ stage 2's code at stage 1's addresses
+	mcr	p15, 0, r0,c7,c5,0
+	.rept	11
+	nop
+	.endr
+	mcr	p15, 0, r0,c7,c5,6	@ flush branch target cache
 	mcr	p15, 0, r0,c7,c5,4  @ flush prefetch buffer
 	ldr	r1, =0x38e00000
 	add	r2, r1, #0x00001000
@@ -160,6 +170,10 @@ reset:
 	msr	cpsr_c, #0xd3
 	mov	r0, #0x100000
 	mov	r1, #0x3c800000
+	str	r0, [r1]
+	@ fw_restore mem:0x0802c490: watchdog write alone is not a software reset.
+	ldr	r0, =0xaaa5
+	ldr	r1, =0x3c500050
 	str	r0, [r1]
 hang:
 	msr	cpsr_c, #0xd3
@@ -229,7 +243,7 @@ prefetch_abort_handler:
 	sub	sp, sp, #0x44
 	mov	r0, #0
 	adr	r1, prefetch_abort_text
-	mrc	p15, 0, r3,c5,c0
+	mrc	p15, 0, r3,c5,c0,1
 	mov	r4, r3,lsr#4
 	and	r4, r4, #0xf
 	and	r5, r3, #0xf
@@ -335,3 +349,9 @@ read_usec_timer:
 
 val_3c700000:
 	.word	0x3c700000
+
+.section .ibss,"aw",%nobits
+.align 2
+.global n4g_reload_boot
+n4g_reload_boot:
+	.space 4

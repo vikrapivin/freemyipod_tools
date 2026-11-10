@@ -37,8 +37,8 @@ OBJ_$(1) := $$(SRC_$(1):%.c=build/$(1)/%.o)
 OBJ_$(1) := $$(OBJ_$(1):%.S=build/$(1)/%.o)
 OBJ_$(1) += $$(EXTRAOBJ_$(1))
 
--include $$(OBJ_$(1):%=%.dep)
-$$(OBJ_$(1)): $$(TARGET_CONFIG_$(1))
+-include $$(OBJ_$(1):%=%.dep) build/$(1)/target/$(1)/crt0.o.dep
+$$(OBJ_$(1)) build/$(1)/target/$(1)/crt0.o: $$(TARGET_CONFIG_$(1))
 
 TARGET_OUTPUT_$(1) ?= build/$(1)/$(NAME)-$(1).ucl
 $(1): $$(TARGET_OUTPUT_$(1))
