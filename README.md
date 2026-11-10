@@ -1,7 +1,15 @@
 # emCORE
 
 This repository contains the emCORE kernel, applications, libraries and host tools.
-The nano5g target supports RAM boot on the S5L8730-based iPod nano 5G.
+The tree builds RAM-boot images for three iPods:
+
+| Target | SoC | Make goal, from `emcore/` |
+|---|---|---|
+| iPod nano 5G | S5L8730 | `make nano5g` |
+| iPod nano 3G | S5L8702 | `make ipodnano3g` |
+| iPod nano 4G | S5L8720 | `make ipodnano4g` |
+
+From the repository root, `make nano5g` is also available. The nano 3G and nano 4G images are built inside `emcore/`. Generating an image does not install emCORE on NAND.
 
 ## Build nano5g
 
@@ -118,3 +126,69 @@ The module loader accepts one module per boot before NAND jobs have started.
 ABI 2 exposes peripheral leases for I2C, LCD, NAND and the click wheel. Kernel
 services, memory layouts and command numbers are described in
 [the target notes](emcore/target/ipodnano5g/README.md).
+
+## Build nano 3G
+
+Required tools are the same as for the nano 5G. From `emcore/`:
+
+```sh
+make ipodnano3g -j4
+```
+
+`make n3g` is the same goal.
+
+| Output | Purpose |
+|---|---|
+| `emcore/build/ipodnano3g/emcore-nano3g.dfu` | Unsigned IMG1 `8702` image: loader and kernel |
+| `emcore/build/ipodnano3g/emcore-nano3g.bin` | Loader, kernel length, and kernel |
+| `emcore/build/ipodnano3g/emcore-nano3g.nm` | Kernel symbols |
+
+The image is unsigned. The mask ROM checks the signature, so it needs a loader that accepts an unsigned image, or a later signing step. The header layout and the SRAM loader are described in [the nano 3G notes](emcore/target/ipodnano3g/README.md).
+
+With the monitor running, from `emcore/`:
+
+```sh
+python3 tools/n3g.py --help
+python3 tools/n3g.py reload
+python3 tools/n3g.py fmss explore --list
+python3 tools/n3g.py nand fault
+```
+
+`reload` replaces the running kernel without returning to DFU. `fmss explore` runs the sequencer experiments. NAND jobs run only when the host asks for them.
+
+## Build nano 4G
+
+Required tools are the same as for the nano 5G. From `emcore/`:
+
+```sh
+make ipodnano4g -j4
+```
+
+| Output | Purpose |
+|---|---|
+| `emcore/build/ipodnano4g/emcore-nano4g.dfu` | Unsigned IMG1 `8720` image: bootstub and kernel |
+| `emcore/build/ipodnano4g/emcore-nano4g.bin` | Bootstub, kernel length, and kernel |
+| `emcore/build/ipodnano4g/emcore.bin` | Raw kernel |
+| `emcore/build/ipodnano4g/emcore-nano4g.nm` | Kernel symbols |
+
+The DFU body stays within 122880 bytes. The image is unsigned. More detail is in [the nano 4G notes](emcore/target/ipodnano4g/README.md).
+
+With the monitor running, from `emcore/`:
+
+```sh
+python3 tools/n4g.py status
+python3 tools/n4g.py cpu-suite --read-only
+python3 tools/n4g.py cpu-suite --one-page
+python3 tools/n4g.py cpu-suite
+python3 tools/n4g.py fmss explore --list
+```
+
+Every `cpu-suite` run uses bank 1 and a page greater than 1023.
+
+`cpu-suite --read-only` reads that page with the FMSS reader and the CPU driver. It does not erase.
+
+`cpu-suite --one-page` uses one logical page greater than 1023, taken from the page spare. Both drivers read it, the CPU driver programs a pattern, and both readers must return that pattern. The block that holds the page is erased for the program and then restored.
+
+`cpu-suite` without a flag does that same program and restore for one page greater than 1023. The page does not have to be a logical page. The backup is written under `nand_device_suite/`.
+
+`fmss explore` runs the sequencer, NAND and ECC experiments.
