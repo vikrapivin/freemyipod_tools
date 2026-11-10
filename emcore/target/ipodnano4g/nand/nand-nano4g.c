@@ -1214,5 +1214,20 @@ int nand_device_init(void)
 
 /* emCORE diagnostic accessors; do not infer physical ECC strength from an erased page. */
 unsigned int nand_get_ecc_bits(void) { return nand_ecclen == 26 ? 16 : 8; }
+
+void n4g_ftl_chip(unsigned int *banks, unsigned int *blocks, unsigned int *ppb,
+                  uint32_t *chipid)
+{
+    if (!nand_ready || !nand_chip)
+    {
+        *banks = *blocks = *ppb = 0;
+        *chipid = 0;
+        return;
+    }
+    *banks = nand_banks;
+    *blocks = nand_chip->blocks;
+    *ppb = nand_chip->pagesperblock;
+    *chipid = nand_id;
+}
 void nand_copy_sector_status(void *out) { memcpy(out, nand_rd.stat, sizeof(nand_rd.stat)); }
 /* emCORE CPU-direct NAND experiments (cpu_nand.c) use the same target check. */

@@ -22,6 +22,10 @@
 #include "nand/nand-target.h"
 #include "nand/rockbox-compat.h"
 
+extern int ftl_init(void);
+extern int ftl_read(uint32_t sector, uint32_t count, void *buffer);
+extern uint32_t ftl_num_sectors(void);
+
 volatile struct nand_poc_status nand_poc_status;
 #define S nand_poc_status
 _Static_assert(sizeof(S) == NPOC_STATUS_BYTES, "status ABI");
@@ -177,7 +181,15 @@ static int step(uint32_t n, uint32_t arg)
         rc = nand_device_init();
         if (!rc) geometry();
         break;
-    default: return -1; /* No logical storage/FTL commands in this monitor. */
+    case NPOC_STEP_FTL:
+        if (!need(1u << NPOC_STEP_FIL)) return -1;
+        rc = ftl_init();
+        S.ftl_pages = rc ? 0 : ftl_num_sectors();
+        S.ftl_bpp = 4096;
+        S.disk_mount_rc = rc ? (uint32_t)rc : 0;
+        if (!rc && !S.ftl_pages) rc = -1;
+        break;
+    default: return -1;
     }
     S.step_status[n] = rc;
     if (!rc) {
@@ -347,6 +359,18 @@ static void run_job(uint32_t kind, const uint32_t *arg)
         else
             rc = fmss_nand_job(arg, &result);
     }
+    else if (kind == NPOC_JOB_FTL_READ) {
+        uint32_t sector = arg[0], count = arg[1];
+        if (!need(1u << NPOC_STEP_FTL)) result = NPOC_R_PRECOND;
+        else if (!count || count > NPOC_RESULT_BYTES / 4096u || sector >= S.ftl_pages
+                 || count > S.ftl_pages - sector)
+            result = NPOC_R_BAD_ARG;
+        else {
+            rc = ftl_read(sector, count, g_result);
+            if (rc) result = NPOC_R_LIB_ERROR;
+            else S.result_len = count * 4096u;
+        }
+    }
     else if (!need(1u << NPOC_STEP_FIL)) result = NPOC_R_PRECOND;
     else if (kind == NPOC_JOB_READ_RESERVED) {
         const struct nand_geometry *g = nand_get_geometry();
@@ -512,11 +536,13 @@ void nand_poc_usb_command(const uint32_t *buf, uint32_t *reply, const void **rep
         reply[3] = S.result_addr;
         return;
     case 121:
-        if (buf[1] < 1 || buf[1] > 4) acc = NPOC_ACCEPT_BAD_ARG;
+        if (buf[1] < 1 || buf[1] > 5) acc = NPOC_ACCEPT_BAD_ARG;
         else acc = queue(NPOC_JOB_STEP, buf[1], buf[2], 0);
         break;
     case 122: acc = queue(NPOC_JOB_READ_RESERVED, buf[1], buf[2], 0); break;
     case 123: acc = queue(NPOC_JOB_READ_PAGE, buf[1], buf[2], buf[3]); break;
+    case NPOC_CMD_FTL_OPEN: acc = queue(NPOC_JOB_STEP, NPOC_STEP_FTL, 0, 0); break;
+    case NPOC_CMD_FTL_READ: acc = queue(NPOC_JOB_FTL_READ, buf[1], buf[2], 0); break;
     case NPOC_CMD_BATCH_ALLOC: acc = queue(NPOC_JOB_BATCH_ALLOC, buf[1], buf[2], 0); break;
     case NPOC_CMD_BATCH_RUN: acc = queue(NPOC_JOB_BATCH_RUN, buf[1], buf[2], buf[3]); break;
     case NPOC_CMD_BATCH_FREE: acc = queue(NPOC_JOB_BATCH_FREE, 0, 0, 0); break;
@@ -527,7 +553,7 @@ void nand_poc_usb_command(const uint32_t *buf, uint32_t *reply, const void **rep
     case NPOC_CMD_WRITE_INFO:
         reply[1] = reply[2] = reply[3] = 0; /* no legacy FTL/write staging API */
         return;
-    case 124: case 125: case 126:
+    case 126:
         acc = NPOC_ACCEPT_BAD_ARG; break;
     case 129: case 130: case 131: case 132: case 133: case 134: case 135: case 136:
         acc = NPOC_ACCEPT_NO_WRITE; break;

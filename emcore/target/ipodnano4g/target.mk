@@ -17,6 +17,13 @@ build/ipodnano4g/nand/fmss-nano4g.h: $(N4G_FMSS_SRC) build/host/fmssasm
 	@mkdir -p $(dir $@)
 	@build/host/fmssasm -s $@ $(N4G_FMSS_SRC)
 build/ipodnano4g/target/ipodnano4g/nand/nand-nano4g.o: build/ipodnano4g/nand/fmss-nano4g.h
+# The generic recipe expands CFLAGS before a target-specific addition is
+# visible. This object is the nano 5G FTL: 4096-byte pages, read only, and
+# its NAND calls are renamed so they do not collide with the nano 4G driver.
+build/ipodnano4g/target/ipodnano5g/nand/ftl-nano5g.o: target/ipodnano5g/nand/ftl-nano5g.c build/version.h
+	@echo [CC] $<
+	@mkdir -p $(dir $@)
+	@$(CC) -c $(CFLAGS) $(CFLAGS_ipodnano4g) -DNAND_PAGE_SIZE=4096 -DN4G_FTL_READ_ONLY -include target/ipodnano4g/nand/ftl-rename.h -DTARGET_ipodnano4g -DTARGET=\"ipodnano4g\" -DCONFIG_H=\"target/ipodnano4g/config.h\" -DTARGET_H=\"target/ipodnano4g/target.h\" -o $@ $<
 
 TARGET_OUTPUT_ipodnano4g := build/ipodnano4g/emcore-nano4g.dfu build/ipodnano4g/emcore-nano4g.bin build/ipodnano4g/emcore-nano4g.nm build/ipodnano4g/emcore-nano4g.map
 include target/ipodnano4g/image.mk

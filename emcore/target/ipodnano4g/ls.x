@@ -8,6 +8,8 @@ MEMORY
     INIT : ORIGIN = 0x08000000, LENGTH = 0x01f80000
     SRAM : ORIGIN = 0x22000000, LENGTH = 0x00030000
     SDRAM : ORIGIN = 0x09f80000, LENGTH = 0x00054000   /* .text/.rodata/.data/.bss, up to the LCD fb */
+    /* FTL mount tables. Not in the DFU image. A stage-2 load at this address replaces them. */
+    FTLRAM : ORIGIN = 0x09000000, LENGTH = 0x00080000
     LCD  : ORIGIN = 0x09FD4000, LENGTH = 0x0002C000
 }
 
@@ -88,6 +90,12 @@ SECTIONS
         . = ALIGN(0x4);
         _ibssend = .;
     } > SRAM
+
+    .ftlstate (NOLOAD) :
+    {
+        *ftl-nano5g.o*(.bss*)
+        *ftl-nano5g.o*(COMMON)
+    } > FTLRAM
 
     .bss (NOLOAD) :
     {

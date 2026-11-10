@@ -31,3 +31,12 @@ pattern. That block is erased for the program and then restored.
 restores the saved pages. The backup is written under `nand_device_suite/`.
 
 `python3 tools/n4g.py fmss explore` runs the sequencer, NAND and ECC matrices.
+
+Logical sectors are 4096 bytes, the same size the nano 5G reader uses. Open the
+volume, then read or dump it. Mount does not program or erase.
+
+```
+python3 tools/n4g.py ftl-open
+python3 tools/n4g.py lread 0 1 -o /tmp/sector0.bin
+python3 tools/n4g.py dump -o /tmp/disk.bin
+```

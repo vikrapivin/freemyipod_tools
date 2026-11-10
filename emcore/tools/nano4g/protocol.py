@@ -22,6 +22,8 @@ class Cmd(IntEnum):
     NAND_COMPARE = 143  # resident comparison through the shared NAND API
     NAND_CPU = 142  # CPU-direct NAND operation, no sequencer program (target/ipodnano4g/cpu_nand.h)
     NAND_FMSS_NAND = 144  # one page program or one block erase through program.s / erase.s
+    NAND_FTL_OPEN = 124   # mount the VFL/FTL (step 5); does not program or erase
+    NAND_FTL_READ = 125   # (sector, count) 4096-byte logical sectors
 
 
 MUTATE = 1 << 18       # selected experiment may program/erase NAND

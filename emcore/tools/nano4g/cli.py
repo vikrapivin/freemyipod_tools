@@ -38,7 +38,7 @@ def parser():
     sub = ap.add_subparsers(dest="command", required=True)
     sub.add_parser("status")
     step = sub.add_parser("step")
-    step.add_argument("number", type=int, choices=(1, 2, 3, 4))
+    step.add_argument("number", type=int, choices=(1, 2, 3, 4, 5))
     page = sub.add_parser("read-page")
     page.add_argument("bank", type=int)
     page.add_argument("row", type=lambda x: int(x, 0))
@@ -128,7 +128,18 @@ def parser():
     fn.add_argument("--page", type=lambda x: int(x, 0), default=0)
     fn.add_argument("--in", dest="input", help="write: 4096 data bytes; a shorter file is padded with 0xff")
     fn.add_argument("--meta", help="write: 10 metadata bytes as hex (default ff x 10)")
-    for command in (sub.choices['status'], step, page, ex, run, cn, suite, fn):
+    sub.add_parser("ftl-open", help="mount the volume (step 5); does not program or erase")
+    lr = sub.add_parser("lread", help="read 4096-byte logical sectors")
+    lr.add_argument("sector", type=lambda x: int(x, 0))
+    lr.add_argument("count", type=lambda x: int(x, 0), nargs="?", default=1)
+    lr.add_argument("-o", "--output")
+    du = sub.add_parser("dump", help="write the logical disk to a file, 4096 bytes per sector")
+    du.add_argument("-o", "--output", required=True)
+    du.add_argument("--start", type=lambda x: int(x, 0), default=0)
+    du.add_argument("--count", type=lambda x: int(x, 0))
+    du.add_argument("--chunk", type=lambda x: int(x, 0), default=32)
+    for command in (sub.choices['status'], step, page, ex, run, cn, suite, fn, lr, du,
+                    sub.choices['ftl-open']):
         command.add_argument('--usb', choices=('auto', 'bulk', 'control'), default='auto',
                              help='bulk on updated kernels; control is the slow diagnostic path')
     return ap
@@ -243,6 +254,76 @@ def mutating_families(s, selected, flag=None):
         except Exception:
             continue
     return out
+
+
+def _lib_rc(st):
+    return st.job_lib_rc - (1 << 32) if st.job_lib_rc & 0x80000000 else st.job_lib_rc
+
+
+def ftl_open_command(s):
+    """Mount the VFL/FTL. Reads the volume; does not program or erase."""
+    from .nand import stack_prepare
+    stack_prepare(s)
+    print('PLAN: FTL open', flush=True)
+    st = s.job(Cmd.NAND_STEP, 5, 0, timeout=300)
+    if st.job_result:
+        raise ToolError('FTL open failed: result %d, lib rc %d' % (st.job_result, _lib_rc(st)))
+    st = s.status()
+    print('FTL open: %d sectors of %d bytes' % (st.ftl_pages, st.ftl_bpp))
+    return 0
+
+
+def ftl_read_sectors(s, sector, count):
+    st = s.status()
+    if not st.step_ok_mask & (1 << 5):
+        raise ToolError('FTL not open: run ftl-open first')
+    if count < 1 or count > 64:
+        raise ToolError('one read is 1..64 sectors of 4096 bytes')
+    if sector < 0 or st.ftl_pages and sector + count > st.ftl_pages:
+        raise ToolError('range %d+%d is past the disk (%d sectors)' % (sector, count, st.ftl_pages))
+    st = s.job(Cmd.NAND_FTL_READ, sector, count, timeout=120)
+    if st.job_result:
+        raise ToolError('logical read at sector %d failed: result %d, lib rc %d' % (
+            sector, st.job_result, _lib_rc(st)))
+    data = s.read(st.result_addr, st.result_len)
+    if len(data) != count * 4096:
+        raise ToolError('logical read returned %d bytes, expected %d' % (len(data), count * 4096))
+    return data
+
+
+def lread_command(s, a):
+    data = ftl_read_sectors(s, a.sector, a.count)
+    if a.output:
+        Path(a.output).write_bytes(data)
+        print('wrote %s (%d x 4096 bytes)' % (a.output, a.count))
+    else:
+        print(data[:256].hex())
+    return 0
+
+
+def dump_command(s, a):
+    st = s.status()
+    if not st.step_ok_mask & (1 << 5):
+        raise ToolError('FTL not open: run ftl-open first')
+    total = st.ftl_pages
+    start = a.start
+    count = total - start if a.count is None else a.count
+    if start < 0 or count < 1 or start + count > total:
+        raise ToolError('range %d+%d is past the disk (%d sectors)' % (start, count, total))
+    chunk = a.chunk
+    if chunk < 1 or chunk > 64:
+        raise ToolError('--chunk must be 1..64')
+    done = 0
+    t0 = time.time()
+    with open(a.output, 'wb') as f:
+        while done < count:
+            n = min(chunk, count - done)
+            f.write(ftl_read_sectors(s, start + done, n))
+            done += n
+            print('  %d/%d sectors' % (done, count), file=sys.stderr)
+    print('wrote %s: sectors %d..%d (%d bytes, %.1f s)' % (
+        a.output, start, start + count - 1, count * 4096, time.time() - t0))
+    return 0
 
 
 def fmss_nand_command(s, a):
@@ -530,6 +611,12 @@ def main(argv=None):
             return cpu_nand_command(s, a)
         elif a.command == "fmss-nand":
             return fmss_nand_command(s, a)
+        elif a.command == "ftl-open":
+            return ftl_open_command(s)
+        elif a.command == "lread":
+            return lread_command(s, a)
+        elif a.command == "dump":
+            return dump_command(s, a)
         elif a.command == "cpu-suite":
             from .cpu_suite import command
             return command(s, a.backup_dir, a.restore, read_only=a.read_only, one_page=a.one_page)

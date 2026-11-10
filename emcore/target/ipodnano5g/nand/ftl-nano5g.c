@@ -478,7 +478,9 @@ static int vfl_read(uint32_t vpn, void *data, uint8_t *meta)
     return nand_read_page(bank, page, data, meta);
 }
 
+#ifndef N4G_FTL_READ_ONLY
 #include "ftl-vfl-write.h"
+#endif
 
 /*
  * FTL: mount from the stored context
@@ -949,6 +951,7 @@ int ftl_init(void)
         return rc;
 
     ftl_writable = false;
+#ifndef N4G_FTL_READ_ONLY
     if (nand_write_supported())
     {
         rc = vfl_write_init();
@@ -957,12 +960,15 @@ int ftl_init(void)
         if (rc)
             return rc;
     }
+#endif
 
     ftl_vbs = vfl_usable - FTL_EXTRA_VBS;
     ftl_pages = ftl_vbs * FTL_PAGES_PER_VB;
     ftl_restored = false;
+#ifndef N4G_FTL_READ_ONLY
     if (nand_write_supported() && vfl_cxt[0][0x6d9])
         return ftl_format_pending();
+#endif
     memset(ftl_blank, 0, sizeof(ftl_blank));
     if (!ftl_load())
     {
@@ -971,6 +977,7 @@ int ftl_init(void)
             return NAND_ERR_FTL;
     }
     ftl_pages = ftl_vbs * FTL_PAGES_PER_VB;
+#ifndef N4G_FTL_READ_ONLY
     if (nand_write_supported())
     {
         rc = ftl_write_mount();
@@ -978,6 +985,7 @@ int ftl_init(void)
             return rc;
         ftl_writable = true;
     }
+#endif
     ftl_mounted = true;
     return 0;
 }
@@ -1045,7 +1053,15 @@ static int ftl_read_current(uint32_t lpn, void *data)
  * serializes users; aligned reads into this buffer never bounce recursively. */
 static uint8_t ftl_transfer[NAND_MAX_PAGES_PER_READ * NAND_PAGE_SIZE] CACHEALIGN_ATTR;
 static int ftl_read_pages(uint32_t sector, uint32_t count, void *buffer);
+#ifndef N4G_FTL_READ_ONLY
 #include "ftl-write.h"
+#else
+static void ftl_count_reads(uint32_t lpn, unsigned int count)
+{
+    (void)lpn;
+    (void)count;
+}
+#endif
 
 /* Read logical pages (4096 bytes each on the nano 4G) in runs of at most 16
  * within one logical block. Fall back to single-page reads for unmapped
@@ -1127,6 +1143,12 @@ static uint8_t ftl_bounce[NAND_PAGE_SIZE] CACHEALIGN_ATTR;
  * protects this buffer, preserving the other 4 KiB half of an 8 KiB page. */
 int ftl_write(uint32_t sector, uint32_t count, const void *buffer)
 {
+#ifdef N4G_FTL_READ_ONLY
+    (void)sector;
+    (void)count;
+    (void)buffer;
+    return NAND_ERR_FTL;
+#else
     const uint32_t spp = FTL_SECTORS_PER_PAGE;
     const uint8_t *data = buffer;
     if (!ftl_mounted || !ftl_writable || sector > ftl_pages * spp
@@ -1157,6 +1179,7 @@ int ftl_write(uint32_t sector, uint32_t count, const void *buffer)
         data += n * 4096;
     }
     return 0;
+#endif
 }
 
 int ftl_read(uint32_t sector, uint32_t count, void *buffer)

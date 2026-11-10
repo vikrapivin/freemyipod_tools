@@ -32,7 +32,9 @@
 /* The nano 5G parts have 4096- or 8192-byte pages; the page size in use is
  * nand_geometry.page_size. NAND_PAGE_SIZE is the largest one, for buffers.
  */
+#ifndef NAND_PAGE_SIZE
 #define NAND_PAGE_SIZE          8192
+#endif
 #define NAND_META_SIZE          12      /* 10 ECC-protected bytes + 0xff 0xff */
 
 /* Pages one sequencer run may read (bounded by the static request lists) */

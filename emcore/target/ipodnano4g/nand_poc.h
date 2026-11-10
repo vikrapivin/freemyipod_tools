@@ -43,6 +43,9 @@
 #define NPOC_JOB_NAND_COMPARE 21u
 #define NPOC_CMD_FMSS_NAND 144u    /* program one page or erase one block with program.s / erase.s */
 #define NPOC_JOB_FMSS_NAND 22u
+#define NPOC_CMD_FTL_OPEN 124u     /* step 5: mount the VFL/FTL, no writes */
+#define NPOC_CMD_FTL_READ 125u     /* (sector, count) 4096-byte logical sectors */
+#define NPOC_JOB_FTL_READ 23u
 #define FMSS_NAND_ERASE 1u
 #define FMSS_NAND_PROGRAM 2u
 #define N4G_PROBE_PROG 0x400u
