@@ -118,10 +118,18 @@ default_interrupt(INT_IRQ63);
 
 static int current_irq;
 
+/* Unhandled-IRQ resilience (2026-09-14, killer-page class): an IRQ nothing
+   services used to panic-FATAL -> permanent hang (USB monitor dead).  Now the
+   line is recorded and MASKED, and the system keeps running.  Hosts can read
+   dbg_unhandled_irq_last / dbg_unhandled_irq_count via memory-read. */
+volatile uint32_t dbg_unhandled_irq_last = 0xffffffffu;
+volatile uint32_t dbg_unhandled_irq_count = 0;
 
 void unhandled_irq(void)
 {
-    panicf(PANIC_FATAL, "Unhandled IRQ %d!", current_irq);
+    dbg_unhandled_irq_last = (uint32_t)current_irq;
+    dbg_unhandled_irq_count++;
+    interrupt_enable(current_irq, false);   /* mask: never let it fire again */
 }
 
 static void (* timervector[])(void) IDATA_ATTR =
@@ -132,11 +140,22 @@ static void (* timervector[])(void) IDATA_ATTR =
 void INT_TIMER(void) ICODE_ATTR;
 void INT_TIMER()
 {
-     int i;
-    for (i = 0; i < ARRAYLEN(timervector); i++)
+    int i;
+    for (i = 0; i < 4; i++)
     {
-        int tcon = TCON(i);
+        uint32_t tcon = TCON(i);
         if (tcon & (tcon >> 4) & 0x7000) timervector[i]();
+    }
+    /* fw_restore mem:0x080067d4: E/F/G/H status occupies bytes 3/2/1/0. */
+    for (i = 4; i < ARRAYLEN(timervector); i++)
+    {
+        unsigned int shift = 8 * (7 - i);
+        uint32_t pending = (TEHSTATUS >> shift) & (TCON(i) >> 12) & 7;
+        if (pending)
+        {
+            timervector[i]();
+            TEHSTATUS = pending << shift;
+        }
     }
 }
 
@@ -181,7 +200,7 @@ static void (* irqvector[])(void) IDATA_ATTR =
     INT_DMAC0,INT_DMAC1,INT_IRQ18,INT_USB_FUNC,INT_IRQ20,INT_IRQ21,INT_IRQ22,INT_IRQ23,
     INT_IRQ24,INT_IRQ25,INT_IRQ26,INT_IRQ27,INT_IRQ28,INT_IRQ29,INT_IRQ30,INT_IRQ31,
     INT_IRQ32,INT_IRQ33,INT_IRQ34,INT_IRQ35,INT_IRQ36,INT_IRQ37,INT_IRQ38,INT_IRQ39,
-    INT_IRQ40,INT_IRQ41,INT_IRQ42,INT_IRQ43,INT_IRQ55,INT_IRQ56,INT_IRQ57,INT_IRQ58,
+    INT_IRQ40,INT_IRQ41,INT_IRQ42,INT_IRQ43,INT_IRQ44,INT_IRQ45,INT_IRQ46,INT_IRQ47,
     INT_IRQ48,INT_IRQ49,INT_IRQ50,INT_IRQ51,INT_IRQ52,INT_IRQ53,INT_IRQ54,INT_IRQ55,
     INT_IRQ56,INT_IRQ57,INT_IRQ58,INT_IRQ59,INT_IRQ60,INT_IRQ61,INT_IRQ62,INT_IRQ63
 };
@@ -194,10 +213,16 @@ void irqhandler(void)
     uint32_t irqs1 = VIC1IRQSTATUS;
     for (current_irq = 0; irqs0; current_irq++, irqs0 >>= 1)
         if (irqs0 & 1)
+        {
             irqvector[current_irq]();
+            VICEDGEACK(0) = 1u << current_irq;
+        }
     for (current_irq = 32; irqs1; current_irq++, irqs1 >>= 1)
         if (irqs1 & 1)
+        {
             irqvector[current_irq]();
+            VICEDGEACK(1) = 1u << (current_irq - 32);
+        }
     VIC0ADDRESS = NULL;
     VIC1ADDRESS = NULL;
 }
@@ -229,9 +254,12 @@ void int_dma_set_handler(int channel, void* handler)
 void interrupt_init(void)
 {
     int i;
-    for (i = 0; i < 8; i++) DMAC0CCONTROL(i) = 0;
+    /*, : the first LCD frame (DMAC0 ch4, lcd.c) is usually still running here. Writing
+       CONTROL of an enabled PL080 channel freezes it, and clearing its TC loses the completion IRQ; either way
+       lcd_dma_busy stayed 1 for good. Running channels are left alone and ch4 keeps a pending TC. */
+    for (i = 0; i < 8; i++) if (!(DMAC0CCONFIG(i) & 1)) DMAC0CCONTROL(i) = 0;
     for (i = 0; i < 8; i++) DMAC1CCONTROL(i) = 0;
-    DMAC0INTTCCLR = 0xff;
+    DMAC0INTTCCLR = 0xff & ~0x10;
     DMAC0INTERRCLR = 0xff;
     DMAC1INTTCCLR = 0xff;
     DMAC1INTERRCLR = 0xff;
