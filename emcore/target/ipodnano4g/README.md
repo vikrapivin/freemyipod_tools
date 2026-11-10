@@ -18,11 +18,14 @@ From `emcore/`, with the monitor running:
 
 ```
 python3 tools/n4g.py status
+python3 tools/n4g.py cpu-suite --read-only
 python3 tools/n4g.py cpu-suite
 ```
 
-`cpu-suite` picks one row on bank 1, above 1024. It compares the FMSS reader
-with the CPU driver, saves the block, programs a pattern from the CPU, and
-restores the saved pages. The backup is written under `nand_device_suite/`.
+`cpu-suite --read-only` reads one page on bank 1, chosen at run time above
+1024, with the FMSS reader and the CPU driver. It does not erase.
+`cpu-suite` without that flag also saves the block, programs a pattern from
+the CPU, and restores the saved pages. The backup is written under
+`nand_device_suite/`.
 
 `python3 tools/n4g.py fmss explore` runs the sequencer, NAND and ECC matrices.

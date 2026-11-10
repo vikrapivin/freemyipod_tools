@@ -114,6 +114,8 @@ def parser():
     cn.add_argument("--json", help="save the parsed job record (without data bytes) as JSON")
     suite = sub.add_parser("cpu-suite",
                            help="on-device CPU NAND read/write test: bank 1, one page chosen at run time")
+    suite.add_argument("--read-only", action="store_true",
+                       help="compare one page with both readers and stop; no erase")
     suite.add_argument("--backup-dir", help="directory for the block backup (default: nand_device_suite/)")
     suite.add_argument("--restore", help="program this cpu-suite backup back and check it with the FMSS reader")
     for command in (sub.choices['status'], step, page, ex, run, cn, suite):
@@ -476,7 +478,7 @@ def main(argv=None):
             return cpu_nand_command(s, a)
         elif a.command == "cpu-suite":
             from .cpu_suite import command
-            return command(s, a.backup_dir, a.restore)
+            return command(s, a.backup_dir, a.restore, read_only=a.read_only)
         elif a.command == "read-page":
             if not 0 <= a.bank < 8 or a.row < 0:
                 raise ToolError("Invalid bank or row")

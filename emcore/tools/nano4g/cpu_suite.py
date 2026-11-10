@@ -250,6 +250,28 @@ def _result(ok, phase, message, **fields):
     return out
 
 
+def run_read(dev, rng):
+    """Compare one page with both readers. Does not erase or program."""
+    dev.prepare()
+    geo = dev.geometry()
+    require_geometry(geo)
+    row = choose_row(rng, geo.pages_per_block, geo.blocks)
+    block, page = divmod(row, geo.pages_per_block)
+    ce = BANK
+    print('cpu-suite: chip %08x, CE%d block %d page %d row %d' % (
+        geo.chip_id, ce, block, page, row), flush=True)
+    fmss = dev.fmss_read(ce, row)
+    _check_live(dev, geo)
+    cpu = dev.cpu_read(ce, row)
+    common = dict(ce=ce, block=block, page=page, row=row, backup=None, chip_id=geo.chip_id, bch=BCH)
+    if not readers_agree(fmss, cpu):
+        return _result(False, 'agree',
+                       'FMSS and CPU reads of row %d differ. Nothing was erased.' % row, **common)
+    return _result(True, 'read',
+                   'PASS CE%d block %d page %d row %d. Both readers agree (%s). Nothing was erased.' % (
+                       ce, block, page, row, fmss.kind), **common)
+
+
 def run_suite(dev, rng, backup_dir, now=None):
     """Compare, back up, program one pattern, and restore. Returns a result dict."""
     dev.prepare()
@@ -444,7 +466,7 @@ class SessionDevice(object):
         self._stack('program', ce, row, data, meta)
 
 
-def command(session, backup_dir=None, restore=None, rng=None, now=None):
+def command(session, backup_dir=None, restore=None, rng=None, now=None, read_only=False):
     directory = Path(backup_dir) if backup_dir else default_backup_dir()
     try:
         dev = SessionDevice(session)
@@ -452,7 +474,8 @@ def command(session, backup_dir=None, restore=None, rng=None, now=None):
             restore_saved(dev, restore)
             print('cpu-suite: PASS restore %s' % restore, flush=True)
             return 0
-        report = run_suite(dev, rng or random.SystemRandom(), directory, now)
+        rng = rng or random.SystemRandom()
+        report = run_read(dev, rng) if read_only else run_suite(dev, rng, directory, now)
     except SuiteError as exc:
         print('cpu-suite: FAIL %s' % exc, flush=True)
         return 1
