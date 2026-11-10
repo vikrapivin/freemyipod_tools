@@ -36,6 +36,7 @@ void timer_init()
     TFCMD = (1 << 1);   /* TF_CLR */
     TGCMD = (1 << 1);   /* TG_CLR */
     THCMD = (1 << 1);   /* TH_CLR */
+    TEHSTATUS = 0xffffffff; /* bl_PreEfi mem:0x2200edf8 */
 }
 
 void timer_schedule_wakeup(uint32_t usecs)
