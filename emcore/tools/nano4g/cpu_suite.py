@@ -250,6 +250,62 @@ def _result(ok, phase, message, **fields):
     return out
 
 
+SCAN_PAGES = 128
+
+
+def run_one_page(dev, rng):
+    """Read one erased page with both drivers, program it from the CPU, and read it back with both.
+
+    The block is not erased. A page that already holds data is left alone.
+    """
+    dev.prepare()
+    geo = dev.geometry()
+    require_geometry(geo)
+    span = geo.pages_per_block * geo.blocks
+    start = choose_row(rng, geo.pages_per_block, geo.blocks)
+    ce = BANK
+    print('cpu-suite: chip %08x, looking for one erased page from row %d' % (geo.chip_id, start), flush=True)
+    row = None
+    for step in range(SCAN_PAGES):
+        candidate = start + step
+        if candidate >= span:
+            break
+        fmss = dev.fmss_read(ce, candidate)
+        if fmss.kind != 'erased':
+            continue
+        _check_live(dev, geo)
+        cpu = dev.cpu_read(ce, candidate)
+        if not readers_agree(fmss, cpu):
+            block, page = divmod(candidate, geo.pages_per_block)
+            return _result(False, 'agree',
+                           'FMSS and CPU reads of row %d differ. Nothing was programmed.' % candidate,
+                           ce=ce, block=block, page=page, row=candidate, backup=None,
+                           chip_id=geo.chip_id, bch=BCH)
+        row = candidate
+        break
+    if row is None:
+        return _result(False, 'read',
+                       'No erased page in the %d rows from %d. Nothing was programmed.' % (SCAN_PAGES, start),
+                       ce=ce, block=start // geo.pages_per_block, page=start % geo.pages_per_block,
+                       row=start, backup=None, chip_id=geo.chip_id, bch=BCH)
+    block, page = divmod(row, geo.pages_per_block)
+    print('cpu-suite: both readers see row %d erased' % row, flush=True)
+    print('PLAN: CPU program pattern at CE%d row %d' % (ce, row), flush=True)
+    dev.program(ce, row, PATTERN, PATTERN_META)
+    try:
+        _expect_pattern(dev.fmss_read(ce, row), row)
+        _expect_pattern(dev.cpu_read(ce, row), row)
+    except SuiteError as exc:
+        return _result(False, 'pattern', str(exc),
+                       ce=ce, block=block, page=page, row=row, backup=None,
+                       chip_id=geo.chip_id, bch=BCH)
+    return _result(True, 'page',
+                   'PASS CE%d block %d page %d row %d. Both readers returned the pattern. '
+                   'The block was not erased.' % (ce, block, page, row),
+                   ce=ce, block=block, page=page, row=row, backup=None,
+                   chip_id=geo.chip_id, bch=BCH)
+
+
 def run_read(dev, rng):
     """Compare one page with both readers. Does not erase or program."""
     dev.prepare()
@@ -466,7 +522,7 @@ class SessionDevice(object):
         self._stack('program', ce, row, data, meta)
 
 
-def command(session, backup_dir=None, restore=None, rng=None, now=None, read_only=False):
+def command(session, backup_dir=None, restore=None, rng=None, now=None, read_only=False, one_page=False):
     directory = Path(backup_dir) if backup_dir else default_backup_dir()
     try:
         dev = SessionDevice(session)
@@ -475,7 +531,12 @@ def command(session, backup_dir=None, restore=None, rng=None, now=None, read_onl
             print('cpu-suite: PASS restore %s' % restore, flush=True)
             return 0
         rng = rng or random.SystemRandom()
-        report = run_read(dev, rng) if read_only else run_suite(dev, rng, directory, now)
+        if one_page:
+            report = run_one_page(dev, rng)
+        elif read_only:
+            report = run_read(dev, rng)
+        else:
+            report = run_suite(dev, rng, directory, now)
     except SuiteError as exc:
         print('cpu-suite: FAIL %s' % exc, flush=True)
         return 1
